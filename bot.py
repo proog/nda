@@ -13,7 +13,7 @@ class Bot:
     nick = 'nda_monitor7'
     user = 'nda_monitor7'
     real_name = 'NDA Monitor Pro 2015 - Keeping IT Confidential (tm)'
-    channel = '#peanutbottertest'
+    channel = '#garachat'
     crlf = '\r\n'
     buffer_size = 1024
     receive_timeout = 10
@@ -33,7 +33,7 @@ class Bot:
 
     def __log(self, msg):
         print(msg)
-        with open('bot.log') as f:
+        with open('bot.log', 'a') as f:
             f.write('%s\r\n' % msg)
 
     def __connect(self):
