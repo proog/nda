@@ -19,6 +19,7 @@ class Bot:
     crlf = '\r\n'
     buffer_size = 1024
     receive_timeout = 10
+    logging = True
     idle_talk = None
 
     def __send(self, msg):
@@ -35,8 +36,10 @@ class Bot:
 
     def __log(self, msg):
         print(msg)
-        with open('bot.log', 'a') as f:
-            f.write('%s\r\n' % msg)
+
+        if self.logging:
+            with open('bot.log', 'a') as f:
+                f.write('%s\r\n' % msg)
 
     def __connect(self):
         self.__log('Connecting to %s:%s' % (self.address, self.port))
