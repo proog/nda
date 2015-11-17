@@ -19,6 +19,8 @@ class Bot:
     crlf = '\r\n'
     buffer_size = 1024
     receive_timeout = 10
+    lines = []
+    unfinished_line = ''
     logging = True
     idle_talk = None
 
@@ -38,8 +40,24 @@ class Bot:
         print(msg)
 
         if self.logging:
-            with open('bot.log', 'a') as f:
+            with open('bot.log', 'a', encoding='utf-8') as f:
                 f.write('%s\r\n' % msg)
+
+    def __readline(self):
+        if len(self.lines) > 0:
+            return self.lines.pop(0)  # if any lines are already read, return them in sequence
+
+        buffer = self.irc.recv(self.buffer_size)
+        data = buffer.decode('utf-8')
+        self.lines = data.split(self.crlf)
+        self.lines[0] = self.unfinished_line + self.lines[0]  # prepend unfinished line to its continuation
+
+        if data.endswith(self.crlf):
+            self.unfinished_line = ''  # buffer ended on a newline, no remainder
+        else:
+            self.unfinished_line = self.lines.pop(-1)  # turn unfinished line into remainder for next readline call
+
+        return self.lines.pop(0)  # return a line
 
     def __connect(self):
         self.__log('Connecting to %s:%s' % (self.address, self.port))
@@ -49,9 +67,9 @@ class Bot:
         self.__send('USER %s 8 * :%s' % (self.user, self.real_name))
 
         while True:
-            buffer = self.irc.recv(self.buffer_size)
-            data = buffer.decode('utf-8').split()
-            self.__log(' '.join(data))
+            line = self.__readline()
+            data = line.split()
+            self.__log(line)
 
             if 'PING' in data:
                 self.__pong(data[-1].lstrip(':'))
@@ -72,9 +90,9 @@ class Bot:
                 self.__send_message(self.channel, self.idle_talk.generate_message())
             return
 
-        buffer = self.irc.recv(self.buffer_size)
-        data = buffer.decode('utf-8').strip().split(' ')
-        self.__log(' '.join(data))
+        line = self.__readline()
+        data = line.split()
+        self.__log(line)
 
         if len(data) > 1:
             command = data[0]

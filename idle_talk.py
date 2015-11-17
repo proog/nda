@@ -29,7 +29,7 @@ class IdleTalk:
         self.last_message = time.time()
         self.delay = self.__random_delay()  # set a random delay for each "quiet period"
 
-        with open(self.log_file, 'a') as file:
+        with open(self.log_file, 'a', encoding='utf-8') as file:
             file.write('%s\r\n' % msg)
 
         self.__trim_log()
@@ -55,7 +55,7 @@ class IdleTalk:
         self.interval = self.__random_interval()
 
         if os.path.isfile(self.log_file):
-            with open(self.log_file) as file:
+            with open(self.log_file, 'r', encoding='utf-8') as file:
                 self.log = file.readlines()
 
         self.__trim_log()
