@@ -45,7 +45,7 @@ class IdleTalk:
         self.last_generated_message = time.time()
         self.interval = self.__random_interval()  # set a random interval after each generated message
 
-        return self.log[random.randint(0, len(self.log))]
+        return self.log[random.randint(0, len(self.log) - 1)]
 
     def __init__(self):
         self.log = []
