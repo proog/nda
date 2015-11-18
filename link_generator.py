@@ -20,11 +20,11 @@ def imgur_link(max_tries):
         combination = generate_combination(chars, 5)
 
         connection = http.client.HTTPConnection('i.imgur.com')
-        connection.request('HEAD', '/%ss.jpg' % combination)
+        connection.request('HEAD', '/%s.jpg' % combination)
         response = connection.getresponse()
 
         if response.status == 200:
-            return 'http://i.imgur.com/%ss.jpg' % combination
+            return 'http://i.imgur.com/%s.jpg' % combination
 
         tries += 1
 
