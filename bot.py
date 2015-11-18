@@ -121,11 +121,7 @@ class Bot:
         if message.lower() == '!hi':
             self._send_message(reply_target, 'hi %s' % source_nick)
         if message.lower() == '!imgur':
-            self._send_message(reply_target, 'ok brb')
             self._send_message(reply_target, link_generator.imgur_link(100))
-        if message.lower() == '!youtube':
-            self._send_message(reply_target, 'ok brb')
-            self._send_message(reply_target, link_generator.youtube_link(100))
         if unit_converter.contains_unit(message):
             converted = unit_converter.convert_unit(message)
             if converted is not None:
