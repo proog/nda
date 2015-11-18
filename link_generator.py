@@ -49,5 +49,25 @@ def youtube_link(max_tries):
 
     return 'couldn\'t find a valid link in %i tries :(' % max_tries
 
+
+def reddit_link(max_tries):
+    chars = lowercase_chars + numbers
+    tries = 0
+
+    while tries < max_tries:
+        combination = generate_combination(chars, 4)
+
+        connection = http.client.HTTPSConnection('www.reddit.com')
+        connection.request('HEAD', '/r/all/comments/3t%s' % combination)
+        response = connection.getresponse()
+
+        if response.status == 200:
+            return 'https://www.reddit.com/r/all/comments/3t%s' % combination
+
+        tries += 1
+
+    return 'couldn\'t find a valid link in %i tries :(' % max_tries
+
+
 if __name__ == '__main__':
-    print('found: ' + imgur_link(100))
+    print('found: ' + reddit_link(100))
