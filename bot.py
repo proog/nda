@@ -3,6 +3,7 @@
 import socket
 import select
 import time
+import datetime
 import link_generator
 import link_lookup
 import unit_converter
@@ -38,9 +39,10 @@ class Bot:
         self._send('PONG :%s' % msg)
 
     def _log(self, msg):
-        print(msg)
+        msg = '%s %s' % (datetime.datetime.utcnow(), msg)
 
         if self.logging:
+            print(msg)
             with open('bot.log', 'a', encoding='utf-8') as f:
                 f.write('%s\r\n' % msg)
 
