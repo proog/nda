@@ -2,6 +2,7 @@
 
 import socket
 import select
+import time
 import link_generator
 import link_lookup
 import unit_converter
@@ -24,26 +25,26 @@ class Bot:
     logging = True
     idle_talk = None
 
-    def __send(self, msg):
+    def _send(self, msg):
         if not msg.endswith(self.crlf):
             msg += self.crlf
         self.irc.send(msg.encode('utf-8'))
 
-    def __send_message(self, to, msg):
-        self.__log('Sending %s to %s' % (msg, to))
-        self.__send('PRIVMSG %s :%s' % (to, msg))
+    def _send_message(self, to, msg):
+        self._log('Sending %s to %s' % (msg.strip(self.crlf), to))
+        self._send('PRIVMSG %s :%s' % (to, msg))
 
-    def __pong(self, msg):
-        self.__send('PONG :%s' % msg)
+    def _pong(self, msg):
+        self._send('PONG :%s' % msg)
 
-    def __log(self, msg):
+    def _log(self, msg):
         print(msg)
 
         if self.logging:
             with open('bot.log', 'a', encoding='utf-8') as f:
                 f.write('%s\r\n' % msg)
 
-    def __readline(self):
+    def _readline(self):
         if len(self.lines) > 0:
             return self.lines.pop(0)  # if any lines are already read, return them in sequence
 
@@ -59,46 +60,48 @@ class Bot:
 
         return self.lines.pop(0)  # return a line
 
-    def __connect(self):
-        self.__log('Connecting to %s:%s' % (self.address, self.port))
+    def _connect(self):
+        self._log('Connecting to %s:%s' % (self.address, self.port))
         self.irc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.irc.connect((self.address, self.port))
-        self.__send('NICK %s' % self.nick)
-        self.__send('USER %s 8 * :%s' % (self.user, self.real_name))
+        self._send('NICK %s' % self.nick)
+        self._send('USER %s 8 * :%s' % (self.user, self.real_name))
 
         while True:
-            line = self.__readline()
+            line = self._readline()
             data = line.split()
-            self.__log(line)
+            self._log(line)
 
             if 'PING' in data:
-                self.__pong(data[-1].lstrip(':'))
+                self._pong(data[-1].lstrip(':'))
                 break
 
-        self.__send('JOIN %s' % self.channel)
+        self._send('JOIN %s' % self.channel)
 
-    def __disconnect(self):
-        self.__log('Disconnecting from %s:%s' % (self.address, self.port))
-        self.__send('JOIN 0')  # leave all channels
+    def _disconnect(self):
+        self._log('Disconnecting from %s:%s' % (self.address, self.port))
+        self._send('JOIN 0')  # leave all channels
         self.irc.close()
 
-    def __receive(self):
+    def _receive(self):
         ready, _, _ = select.select([self.irc], [], [], self.receive_timeout)
 
         if len(ready) == 0:  # if nothing to receive within timeout, check if it's time to talk
             if self.idle_talk.can_talk():
-                self.__send_message(self.channel, self.idle_talk.generate_message())
+                self._send_message(self.channel, self.idle_talk.generate_message())
             return
 
-        line = self.__readline()
+        line = self._readline()
         data = line.split()
-        self.__log(line)
+        self._log(line)
 
         if len(data) > 1:
             command = data[0]
 
             if command == 'PING':
-                self.__pong(' '.join(data[1:]).lstrip(':'))
+                self._pong(' '.join(data[1:]).lstrip(':'))
+            elif command == 'ERROR':
+                raise ValueError('Received ERROR from server (%s)' % line)
 
         if len(data) > 3:
             source = data[0].lstrip(':')
@@ -110,41 +113,51 @@ class Bot:
                 reply_target = target if target.startswith('#') else source_nick  # channel or direct message
                 message = ' '.join(data[3:]).strip().lstrip(':')
 
-                self.__parse_message(message, reply_target, source_nick)
+                self._parse_message(message, reply_target, source_nick)
 
-    def __parse_message(self, message, reply_target, source_nick):
+    def _parse_message(self, message, reply_target, source_nick):
         self.idle_talk.add_message(message)  # add other message to the idle talk log
 
         if message.lower() == '!hi':
-            self.__send_message(reply_target, 'hi %s' % source_nick)
+            self._send_message(reply_target, 'hi %s' % source_nick)
         if message.lower() == '!imgur':
-            self.__send_message(reply_target, 'ok brb')
-            self.__send_message(reply_target, link_generator.imgur_link(100))
+            self._send_message(reply_target, 'ok brb')
+            self._send_message(reply_target, link_generator.imgur_link(100))
         if message.lower() == '!youtube':
-            self.__send_message(reply_target, 'ok brb')
-            self.__send_message(reply_target, link_generator.youtube_link(100))
+            self._send_message(reply_target, 'ok brb')
+            self._send_message(reply_target, link_generator.youtube_link(100))
         if unit_converter.contains_unit(message):
             converted = unit_converter.convert_unit(message)
             if converted is not None:
-                self.__send_message(reply_target, '^^ %.2f %s' % (converted[0], converted[1]))
+                self._send_message(reply_target, '^^ %.2f %s' % (converted[0], converted[1]))
         if link_lookup.contains_youtube(message):
             title = link_lookup.youtube_lookup(message)
             if title is not None:
-                self.__send_message(reply_target, '^^ %s' % title)
+                self._send_message(reply_target, '^^ %s' % title)
 
-    def start(self):
-        self.__connect()
+    def _main_loop(self):
+        self.lines = []
+        self.unfinished_line = ''
         self.idle_talk = IdleTalk()
 
+        self._connect()
         while True:
-            self.__receive()
+            self._receive()
 
-    def stop(self):
-        self.__disconnect()
+    def start(self):
+        while True:  # keep trying to run the main loop even after errors occur
+            try:
+                self._main_loop()
+            except ValueError as irc_error:
+                self._log('Error received from the server: %s' % irc_error.args)
+                self._disconnect()
+            except OSError as os_error:
+                self._log('An error occurred (%i): %s' % (os_error.errno, os_error.strerror))
+                time.sleep(10)
+            except KeyboardInterrupt:
+                self._disconnect()
+                break
 
 if __name__ == '__main__':
     bot = Bot()
-    try:
-        bot.start()
-    except KeyboardInterrupt:
-        bot.stop()
+    bot.start()

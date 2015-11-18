@@ -13,13 +13,13 @@ class IdleTalk:
     min_message_interval = 5
     max_message_interval = 1800
 
-    def __random_delay(self):
+    def _random_delay(self):
         return random.randint(self.min_idle_delay, self.max_idle_delay)
 
-    def __random_interval(self):
+    def _random_interval(self):
         return random.randint(self.min_message_interval, self.max_message_interval)
 
-    def __trim_log(self):
+    def _trim_log(self):
         while len(self.log) > self.max_log_length:
             i = random.randint(0, len(self.log) - 1)
             del self.log[i]  # remove random message from log
@@ -27,12 +27,12 @@ class IdleTalk:
     def add_message(self, msg):
         self.log.append(msg)
         self.last_message = time.time()
-        self.delay = self.__random_delay()  # set a random delay for each "quiet period"
+        self.delay = self._random_delay()  # set a random delay for each "quiet period"
 
         with open(self.log_file, 'a', encoding='utf-8') as file:
             file.write('%s\r\n' % msg)
 
-        self.__trim_log()
+        self._trim_log()
 
     def can_talk(self):
         t = time.time()
@@ -43,7 +43,7 @@ class IdleTalk:
 
     def generate_message(self):
         self.last_generated_message = time.time()
-        self.interval = self.__random_interval()  # set a random interval after each generated message
+        self.interval = self._random_interval()  # set a random interval after each generated message
 
         return self.log[random.randint(0, len(self.log) - 1)]
 
@@ -51,11 +51,11 @@ class IdleTalk:
         self.log = []
         self.last_message = time.time()
         self.last_generated_message = 0
-        self.delay = self.__random_delay()
-        self.interval = self.__random_interval()
+        self.delay = self._random_delay()
+        self.interval = self._random_interval()
 
         if os.path.isfile(self.log_file):
             with open(self.log_file, 'r', encoding='utf-8') as file:
                 self.log = file.readlines()
 
-        self.__trim_log()
+        self._trim_log()
