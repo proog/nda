@@ -133,7 +133,7 @@ class Bot:
         if link_lookup.contains_youtube(message):
             title = link_lookup.youtube_lookup(message)
             if title is not None:
-                self._send_message(reply_target, '^^ %s' % title)
+                self._send_message(reply_target, '^^ \x02%s\x02' % title)  # 0x02 == control character for bold text
 
     def _main_loop(self):
         self.lines = []
