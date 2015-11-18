@@ -1,4 +1,5 @@
 import http
+import http.client
 import random
 
 
@@ -16,14 +17,14 @@ def imgur_link(max_tries):
     tries = 0
 
     while tries < max_tries:
-        combination = generate_combination(chars, 7)
+        combination = generate_combination(chars, 5)
 
         connection = http.client.HTTPConnection('i.imgur.com')
-        connection.request('HEAD', '/%s.jpg' % combination)
+        connection.request('HEAD', '/%ss.jpg' % combination)
         response = connection.getresponse()
 
         if response.status == 200:
-            return 'http://i.imgur.com/%s.jpg' % combination
+            return 'http://i.imgur.com/%ss.jpg' % combination
 
         tries += 1
 
@@ -47,3 +48,6 @@ def youtube_link(max_tries):
         tries += 1
 
     return 'couldn\'t find a valid link in %i tries :(' % max_tries
+
+if __name__ == '__main__':
+    print('found: ' + imgur_link(100))
