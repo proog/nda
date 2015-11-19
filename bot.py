@@ -143,6 +143,7 @@ class Bot:
             if shell.git_pull():
                 self._send_message(reply_target, 'pull succeeded, restarting')
                 self._disconnect()
+                time.sleep(5)  # give the server time to process disconnection to prevent nick collision
                 shell.restart(__file__)
             else:
                 self._send_message(reply_target, 'pull failed wih non-zero return code :(')
@@ -163,9 +164,10 @@ class Bot:
             except ValueError as irc_error:
                 self._log('Error received from the server: %s' % irc_error.args)
                 self._disconnect()
+                time.sleep(5)
             except OSError as os_error:
                 self._log('An error occurred (%i): %s' % (os_error.errno, os_error.strerror))
-                time.sleep(10)
+                time.sleep(5)
             except KeyboardInterrupt:
                 self._disconnect()
                 break
