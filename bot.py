@@ -7,24 +7,31 @@ import datetime
 import link_generator
 import link_lookup
 import unit_converter
+import shell
 from idle_talk import IdleTalk
 
 
 class Bot:
     irc = None
-    address = 'irc.synirc.net'
-    port = 6667
-    nick = 'nda_monitor7'
-    user = 'nda_monitor7'
-    real_name = 'NDA Monitor Pro 2015 - Keeping IT Confidential (tm)'
-    channel = '#garachat'
-    crlf = '\r\n'
     buffer_size = 1024
     receive_timeout = 10
     lines = []
     unfinished_line = ''
     logging = True
     idle_talk = None
+
+    def __init__(self, address, user, nick, real_name, channel, trusted_nicks=None, port=6667,
+                 quit_message='disconnecting', logging=True, crlf='\r\n'):
+        self.address = address
+        self.user = user
+        self.nick = nick
+        self.real_name = real_name
+        self.channel = channel
+        self.trusted_nicks = trusted_nicks if trusted_nicks is not None else []
+        self.port = port
+        self.quit_message = quit_message
+        self.logging = logging
+        self.crlf = crlf
 
     def _send(self, msg):
         if not msg.endswith(self.crlf):
@@ -44,7 +51,7 @@ class Bot:
         if self.logging:
             print(msg)
             with open('bot.log', 'a', encoding='utf-8') as f:
-                f.write('%s\r\n' % msg)
+                f.write('%s%s' % (msg, self.crlf))
 
     def _readline(self):
         if len(self.lines) > 0:
@@ -82,7 +89,7 @@ class Bot:
 
     def _disconnect(self):
         self._log('Disconnecting from %s:%s' % (self.address, self.port))
-        self._send('JOIN 0')  # leave all channels
+        self._send('QUIT :%s' % self.quit_message)
         self.irc.close()
 
     def _receive(self):
@@ -134,6 +141,20 @@ class Bot:
             title = link_lookup.youtube_lookup(message)
             if title is not None:
                 self._send_message(reply_target, '^^ \x02%s\x02' % title)  # 0x02 == control character for bold text
+        if message.startswith('!shell ') and source_nick in self.trusted_nicks and False:
+            shell_command = ''.join(message.split('!shell ')[1:])
+            output = shell.run(shell_command)
+            for line in output:
+                self._send_message(reply_target, line)
+        if message.lower() == '!update' and source_nick in self.trusted_nicks:
+            pull_success = shell.git_pull()
+
+            if not pull_success:
+                self._send_message(reply_target, 'pull failed wih non-zero return code :(')
+            else:
+                self._send_message(reply_target, 'pull succeeded, restarting')
+                self._disconnect()
+                shell.restart(__file__)
 
     def _main_loop(self):
         self.lines = []
@@ -158,6 +179,12 @@ class Bot:
                 self._disconnect()
                 break
 
+
 if __name__ == '__main__':
-    bot = Bot()
+    bot = Bot(address='irc.synirc.net',
+              user='nda_monitor7',
+              nick='nda_monitor7',
+              real_name='NDA Monitor Pro 2015 - Keeping IT Confidential (tm)',
+              channel='#garachat',
+              trusted_nicks=['proog'])
     bot.start()
