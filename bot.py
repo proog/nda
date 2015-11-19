@@ -57,6 +57,11 @@ class Bot:
         if len(self.lines) > 0:
             return self.lines.pop(0)  # if any lines are already read, return them in sequence
 
+        ready, _, _ = select.select([self.irc], [], [], self.receive_timeout)
+
+        if len(ready) == 0:  # if no lines and nothing received, return None
+            return None
+
         buffer = self.irc.recv(self.buffer_size)
         data = buffer.decode('utf-8')
         self.lines = data.split(self.crlf)
@@ -86,14 +91,13 @@ class Bot:
             self._log('An error occurred while disconnecting (%i): %s' % (os_error.errno, os_error.strerror))
 
     def _receive(self):
-        ready, _, _ = select.select([self.irc], [], [], self.receive_timeout)
+        line = self._readline()  # a line or None if nothing received
 
-        if len(ready) == 0:  # if nothing to receive within timeout, check if it's time to talk
+        if line is None:  # if no more lines and none received within timeout, check if it's time to talk
             if self.idle_talk.can_talk():
                 self._send_message(self.channel, self.idle_talk.generate_message())
             return
 
-        line = self._readline()
         data = line.split()
         self._log(line)
 
