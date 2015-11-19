@@ -76,21 +76,14 @@ class Bot:
         self._send('NICK %s' % self.nick)
         self._send('USER %s 8 * :%s' % (self.user, self.real_name))
 
-        while True:
-            line = self._readline()
-            data = line.split()
-            self._log(line)
-
-            if 'PING' in data:
-                self._pong(data[-1].lstrip(':'))
-                break
-
-        self._send('JOIN %s' % self.channel)
-
     def _disconnect(self):
         self._log('Disconnecting from %s:%s' % (self.address, self.port))
-        self._send('QUIT :%s' % self.quit_message)
-        self.irc.close()
+
+        try:
+            self._send('QUIT :%s' % self.quit_message)
+            self.irc.close()
+        except OSError as os_error:
+            self._log('An error occurred while disconnecting (%i): %s' % (os_error.errno, os_error.strerror))
 
     def _receive(self):
         ready, _, _ = select.select([self.irc], [], [], self.receive_timeout)
@@ -111,17 +104,17 @@ class Bot:
                 self._pong(' '.join(data[1:]).lstrip(':'))
             elif command == 'ERROR':
                 raise ValueError('Received ERROR from server (%s)' % line)
-
         if len(data) > 3:
             source = data[0].lstrip(':')
             source_nick = source.split('!')[0]
             command = data[1]
 
-            if command == 'PRIVMSG':
+            if command == '001':  # RPL_WELCOME: successful client registration
+                self._send('JOIN %s' % self.channel)
+            elif command == 'PRIVMSG':
                 target = data[2]
                 reply_target = target if target.startswith('#') else source_nick  # channel or direct message
                 message = ' '.join(data[3:]).strip().lstrip(':')
-
                 self._parse_message(message, reply_target, source_nick)
 
     def _parse_message(self, message, reply_target, source_nick):
@@ -147,14 +140,12 @@ class Bot:
             for line in output:
                 self._send_message(reply_target, line)
         if message.lower() == '!update' and source_nick in self.trusted_nicks:
-            pull_success = shell.git_pull()
-
-            if not pull_success:
-                self._send_message(reply_target, 'pull failed wih non-zero return code :(')
-            else:
+            if shell.git_pull():
                 self._send_message(reply_target, 'pull succeeded, restarting')
                 self._disconnect()
                 shell.restart(__file__)
+            else:
+                self._send_message(reply_target, 'pull failed wih non-zero return code :(')
 
     def _main_loop(self):
         self.lines = []
