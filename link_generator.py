@@ -1,6 +1,7 @@
-import urllib.request
+import http
+import http.client
 import random
-from urllib.error import *
+
 
 lowercase_chars = 'abcdefghijklmnopqrstuvwxyz'
 uppercase_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -17,15 +18,15 @@ def imgur_link():
 
     for attempt in range(0, max_tries):
         combination = generate_combination(chars, 5)
-        url = 'http://i.imgur.com/%s.jpg' % combination
-        request = urllib.request.Request(url, method='HEAD')
 
         try:
-            response = urllib.request.urlopen(request)
+            connection = http.client.HTTPConnection('i.imgur.com')
+            connection.request('HEAD', '/%s.jpg' % combination)
+            response = connection.getresponse()
 
             if response.status == 200:
-                return url
-        except (HTTPError, URLError):
+                return 'http://i.imgur.com/%s.jpg' % combination
+        except http.client.HTTPException:
             return 'connection failed, please try again later :('
 
     return 'couldn\'t find a valid link in %i tries :(' % max_tries
@@ -36,15 +37,15 @@ def reddit_link():
 
     for attempt in range(0, max_tries):
         combination = generate_combination(chars, 4)
-        url = 'https://www.reddit.com/r/all/comments/3t%s' % combination
-        request = urllib.request.Request(url, method='HEAD')
 
         try:
-            response = urllib.request.urlopen(request)
+            connection = http.client.HTTPSConnection('www.reddit.com')
+            connection.request('HEAD', '/r/all/comments/3t%s' % combination)
+            response = connection.getresponse()
 
             if response.status == 200:
-                return url
-        except (HTTPError, URLError):
+                return 'https://www.reddit.com/r/all/comments/3t%s' % combination
+        except http.client.HTTPException:
             return 'connection failed, please try again later :('
 
     return 'couldn\'t find a valid link in %i tries :(' % max_tries
