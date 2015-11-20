@@ -1,6 +1,7 @@
 import urllib.request
 import re
 import json
+from urllib.error import *
 
 
 def extract_youtube_id(message):
@@ -22,14 +23,21 @@ def youtube_lookup(message):
     if youtube_id is None:
         return None
 
-    response = urllib.request.urlopen('https://www.googleapis.com/youtube/v3/videos?part=snippet&id=%s&key=%s' % (youtube_id, api_key))
-    data = response.read()
-    json_data = json.loads(data.decode('utf-8'))
+    try:
+        response = urllib.request.urlopen('https://www.googleapis.com/youtube/v3/videos?part=snippet&id=%s&key=%s' % (youtube_id, api_key))
+        data = response.read()
+        json_data = json.loads(data.decode('utf-8'))
 
-    if 'items' in json_data \
-            and len(json_data['items']) > 0 \
-            and 'snippet' in json_data['items'][0] \
-            and 'title' in json_data['items'][0]['snippet']:
-        return json_data['items'][0]['snippet']['title']
+        if 'items' in json_data \
+                and len(json_data['items']) > 0 \
+                and 'snippet' in json_data['items'][0] \
+                and 'title' in json_data['items'][0]['snippet']:
+            return json_data['items'][0]['snippet']['title']
+        else:
+            return None
+    except (HTTPError, URLError):
+        return None
 
-    return None
+
+if __name__ == '__main__':
+    print(youtube_lookup('https://www.youtube.com/watch?v=g6QW-rFtKfA&feature=youtu.be&t=1529'))

@@ -127,9 +127,9 @@ class Bot:
         if message.lower() == '!hi':
             self._send_message(reply_target, 'hi %s' % source_nick)
         if message.lower() == '!imgur':
-            self._send_message(reply_target, link_generator.imgur_link(100))
+            self._send_message(reply_target, link_generator.imgur_link())
         if message.lower() == '!reddit':
-            self._send_message(reply_target, link_generator.reddit_link(100))
+            self._send_message(reply_target, link_generator.reddit_link())
         if unit_converter.contains_unit(message):
             converted = unit_converter.convert_unit(message)
             if converted is not None:
