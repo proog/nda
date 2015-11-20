@@ -5,7 +5,7 @@ from urllib.error import *
 
 
 def extract_youtube_id(message):
-    match = re.match(r'.*(youtube.com/watch\?v=|youtu.be/)([a-zA-Z0-9_\-]{11}).*', message)
+    match = re.search(r'(youtube.com/watch\?v=|youtu.be/)([a-zA-Z0-9_\-]{11})', message)
 
     if match is not None and len(match.groups()) == 2:
         return match.group(2)
@@ -39,5 +39,41 @@ def youtube_lookup(message):
         return None
 
 
+def extract_link(message):
+    match = re.search(r'.*(http(s)?://.+)(\s+|$)', message)
+
+    if match is not None and len(match.groups()) == 3:
+        return match.group(1)
+    return None
+
+
+def contains_link(message):
+    return extract_link(message) is not None
+
+
+def generic_lookup(message):
+    link = extract_link(message)
+
+    if link is None:
+        return None
+
+    try:
+        response = urllib.request.urlopen(link)
+
+        if response.status != 200:
+            return None
+
+        data = response.read().decode('utf-8', errors='ignore').replace('\n', '')
+        title_match = re.search(r'.*<title>(.+)</title>.*', data, flags=re.IGNORECASE)
+
+        if title_match is not None and len(title_match.groups()) == 1:
+            return title_match.group(1)
+        else:
+            return None
+    except (HTTPError, URLError):
+        return None
+
+
 if __name__ == '__main__':
     print(youtube_lookup('https://www.youtube.com/watch?v=g6QW-rFtKfA&feature=youtu.be&t=1529'))
+    print(generic_lookup('hi here is a link for you https://permortensen.com/about'))

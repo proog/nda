@@ -122,28 +122,17 @@ class Bot:
                 self._parse_message(message, reply_target, source_nick)
 
     def _parse_message(self, message, reply_target, source_nick):
-        self.idle_talk.add_message(message)  # add other message to the idle talk log
-
+        # explicit commands
         if message.lower() == '!hi':
             self._send_message(reply_target, 'hi %s' % source_nick)
-        if message.lower() == '!imgur':
+            return
+        elif message.lower() == '!imgur':
             self._send_message(reply_target, link_generator.imgur_link())
-        if message.lower() == '!reddit':
+            return
+        elif message.lower() == '!reddit':
             self._send_message(reply_target, link_generator.reddit_link())
-        if unit_converter.contains_unit(message):
-            converted = unit_converter.convert_unit(message)
-            if converted is not None:
-                self._send_message(reply_target, '^^ %.2f %s' % (converted[0], converted[1]))
-        if link_lookup.contains_youtube(message):
-            title = link_lookup.youtube_lookup(message)
-            if title is not None:
-                self._send_message(reply_target, '^^ \x02%s\x02' % title)  # 0x02 == control character for bold text
-        if message.startswith('!shell ') and source_nick in self.trusted_nicks and False:
-            shell_command = ''.join(message.split('!shell ')[1:])
-            output = shell.run(shell_command)
-            for line in output:
-                self._send_message(reply_target, line)
-        if message.lower() == '!update' and source_nick in self.trusted_nicks:
+            return
+        elif message.lower() == '!update' and source_nick in self.trusted_nicks:
             if shell.git_pull():
                 self._send_message(reply_target, 'pull succeeded, restarting')
                 self._disconnect()
@@ -151,6 +140,29 @@ class Bot:
                 shell.restart(__file__)
             else:
                 self._send_message(reply_target, 'pull failed wih non-zero return code :(')
+            return
+        elif message.startswith('!shell ') and source_nick in self.trusted_nicks and False:
+            shell_command = ''.join(message.split('!shell ')[1:])
+            output = shell.run(shell_command)
+            for line in output:
+                self._send_message(reply_target, line)
+            return
+
+        # link and unit lookups
+        if link_lookup.contains_youtube(message):
+            title = link_lookup.youtube_lookup(message)
+            if title is not None:
+                self._send_message(reply_target, '^^ \x02%s\x02' % title)  # 0x02 == control character for bold text
+        elif link_lookup.contains_link(message):
+            title = link_lookup.generic_lookup(message)
+            if title is not None:
+                self._send_message(reply_target, '^^ \x02%s\x02' % title)
+        elif unit_converter.contains_unit(message):
+            converted = unit_converter.convert_unit(message)
+            if converted is not None:
+                self._send_message(reply_target, '^^ %.2f %s' % (converted[0], converted[1]))
+
+        self.idle_talk.add_message(message)  # add message to the idle talk log
 
     def _main_loop(self):
         self.lines = []
