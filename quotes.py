@@ -55,7 +55,7 @@ class Quotes:
         author = author.lower().strip('_ ')  # try to normalize nicks to lowercase versions and no alts
         message = message.rstrip()  # remove trailing whitespace from message
 
-        if timestamp == 0 or len(author) == 0 or len(message) == 0 or author in self.ignore_nicks:
+        if timestamp == 0 or len(author) == 0 or len(message) == 0 or author in self.ignore_nicks or len(message.split()) < 3:
             return False
 
         if author in self.nick_map.keys():
