@@ -88,7 +88,7 @@ class Quotes:
             date = datetime.utcfromtimestamp(row[0]).strftime('%b %d %Y')
             author = row[1]
             message = row[2]
-            return '%s   -- %s, %s' % (message, author, date)
+            return '%s -- %s, %s' % (message, author, date)
 
         return 'no quotes found :(' if author is None else 'no quotes found for %s :(' % author
 
