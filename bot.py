@@ -137,7 +137,7 @@ class Bot:
         elif message.lower() == '!reddit':
             self._send_message(reply_target, link_generator.reddit_link())
             return
-        elif tokens[0] == '!quote':
+        elif tokens[0] == '!quote' and False:
             self._send_message(reply_target, self.quotes.random_quote(tokens[1] if len(tokens) > 1 else None))
             return
         elif message.lower() == '!update' and source_nick in self.trusted_nicks:
