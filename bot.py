@@ -9,6 +9,7 @@ import link_lookup
 import unit_converter
 import shell
 from idle_talk import IdleTalk
+from quotes import Quotes
 
 
 class Bot:
@@ -19,6 +20,7 @@ class Bot:
     unfinished_line = ''
     logging = True
     idle_talk = None
+    quotes = None
 
     def __init__(self, address, user, nick, real_name, channel, trusted_nicks=None, port=6667,
                  quit_message='disconnecting', logging=True, crlf='\r\n'):
@@ -83,6 +85,7 @@ class Bot:
 
     def _disconnect(self):
         self._log('Disconnecting from %s:%s' % (self.address, self.port))
+        self.quotes.close()
 
         try:
             self._send('QUIT :%s' % self.quit_message)
@@ -122,6 +125,8 @@ class Bot:
                 self._parse_message(message, reply_target, source_nick)
 
     def _parse_message(self, message, reply_target, source_nick):
+        tokens = message.split()
+
         # explicit commands
         if message.lower() == '!hi':
             self._send_message(reply_target, 'hi %s' % source_nick)
@@ -131,6 +136,9 @@ class Bot:
             return
         elif message.lower() == '!reddit':
             self._send_message(reply_target, link_generator.reddit_link())
+            return
+        elif tokens[0] == '!quote':
+            self._send_message(reply_target, self.quotes.random_quote(tokens[1] if len(tokens) > 1 else None))
             return
         elif message.lower() == '!update' and source_nick in self.trusted_nicks:
             if shell.git_pull():
@@ -163,11 +171,13 @@ class Bot:
                 self._send_message(reply_target, '^^ %.2f %s' % (converted[0], converted[1]))
 
         self.idle_talk.add_message(message)  # add message to the idle talk log
+        self.quotes.add_quote(int(time.time()), source_nick, message)  # add message to the quotes database
 
     def _main_loop(self):
         self.lines = []
         self.unfinished_line = ''
         self.idle_talk = IdleTalk()
+        self.quotes = Quotes(self.channel)
 
         self._connect()
         while True:
