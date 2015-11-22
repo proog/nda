@@ -51,5 +51,22 @@ def reddit_link():
     return 'couldn\'t find a valid link in %i tries :(' % max_tries
 
 
+def xhamster_link():
+    try:
+        connection = http.client.HTTPConnection('xhamster.com')
+        connection.request('HEAD', '/random.php')
+        response = connection.getresponse()
+        location = response.getheader('Location', None)
+
+        if response.status != 302 or location is None:
+            raise ValueError()
+
+        return location
+    except http.client.HTTPException:
+        return 'connection failed, please try again later :('
+    except ValueError:
+        return 'unexpected headers, the fuckers changed their response :('
+
+
 if __name__ == '__main__':
     print('found: ' + reddit_link())
