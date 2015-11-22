@@ -4,6 +4,7 @@ import socket
 import select
 import time
 import datetime
+import json
 import link_generator
 import link_lookup
 import unit_converter
@@ -16,24 +17,25 @@ class Bot:
     irc = None
     buffer_size = 1024
     receive_timeout = 10
+    crlf = '\r\n'
     lines = []
     unfinished_line = ''
-    logging = True
     idle_talk = None
     quotes = None
 
-    def __init__(self, address, user, nick, real_name, channel, trusted_nicks=None, port=6667,
-                 quit_message='disconnecting', logging=True, crlf='\r\n'):
-        self.address = address
-        self.user = user
-        self.nick = nick
-        self.real_name = real_name
-        self.channel = channel
-        self.trusted_nicks = trusted_nicks if trusted_nicks is not None else []
-        self.port = port
-        self.quit_message = quit_message
-        self.logging = logging
-        self.crlf = crlf
+    def __init__(self, conf_file):
+        with open(conf_file, 'r', encoding='utf-8') as f:
+            conf = json.load(f)
+            self.address = conf['address']
+            self.port = conf['port'] if 'port' in conf.keys() else 6667
+            self.user = conf['user']
+            self.nick = conf['nick']
+            self.real_name = conf['real_name']
+            self.channel = conf['channel']
+            self.nickserv_password = conf['nickserv_password'] if 'nickserv_password' in conf.keys() else None
+            self.trusted_nicks = conf['trusted_nicks'] if 'trusted_nicks' in conf.keys() else []
+            self.quit_message = conf['quit_message'] if 'quit_message' in conf.keys() else ''
+            self.logging = conf['logging'] if 'logging' in conf.keys() else False
 
     def _send(self, msg):
         if not msg.endswith(self.crlf):
@@ -119,6 +121,8 @@ class Bot:
             command = data[1]
 
             if command == '001':  # RPL_WELCOME: successful client registration
+                if self.nickserv_password is not None:
+                    self._send_message('NickServ', 'IDENTIFY %s' % self.nickserv_password)
                 self._send('JOIN %s' % self.channel)
             elif command == 'PRIVMSG':
                 target = data[2]
@@ -205,10 +209,5 @@ class Bot:
 
 
 if __name__ == '__main__':
-    bot = Bot(address='irc.synirc.net',
-              user='nda_monitor7',
-              nick='nda_monitor7',
-              real_name='NDA Monitor Pro 2015 - Keeping IT Confidential (tm)',
-              channel='#garachat',
-              trusted_nicks=['proog'])
+    bot = Bot('bot.conf')
     bot.start()
