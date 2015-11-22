@@ -69,8 +69,10 @@ class Bot:
         self.lines = data.split(self.crlf)
         self.lines[0] = self.unfinished_line + self.lines[0]  # prepend unfinished line to its continuation
 
-        if data.endswith(self.crlf):
+        # if the buffer ended on a newline, the last element will be empty string
+        if len(self.lines[-1]) == 0:
             self.unfinished_line = ''  # buffer ended on a newline, no remainder
+            del self.lines[-1]
         else:
             self.unfinished_line = self.lines.pop(-1)  # turn unfinished line into remainder for next readline call
 
