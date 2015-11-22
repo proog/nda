@@ -67,18 +67,16 @@ class Bot:
             return None
 
         buffer = self.irc.recv(self.buffer_size)
-        data = buffer.decode('utf-8')
-        self.lines = data.split(self.crlf)
-        self.lines[0] = self.unfinished_line + self.lines[0]  # prepend unfinished line to its continuation
+        data = self.unfinished_line + buffer.decode('utf-8')  # prepend unfinished line to its continuation
+        lines = data.split(self.crlf)
 
-        # if the buffer ended on a newline, the last element will be empty string
-        if len(self.lines[-1]) == 0:
-            self.unfinished_line = ''  # buffer ended on a newline, no remainder
-            del self.lines[-1]
-        else:
-            self.unfinished_line = self.lines.pop(-1)  # turn unfinished line into remainder for next readline call
+        # if buffer ended on newline, the last element will be empty string
+        # otherwise, the last element will be an unfinished line
+        # if no newlines found in buffer, the entire buffer is an unfinished line (line longer than buffer_size)
+        self.unfinished_line = lines.pop(-1)
+        self.lines = lines
 
-        return self.lines.pop(0)  # return a line
+        return self._readline()  # recurse until a finished line is found or nothing is received within timeout
 
     def _connect(self):
         self._log('Connecting to %s:%s' % (self.address, self.port))
