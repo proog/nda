@@ -52,21 +52,26 @@ def reddit_link():
 
 
 def xhamster_link():
-    try:
-        connection = http.client.HTTPConnection('xhamster.com')
-        connection.request('HEAD', '/random.php')
-        response = connection.getresponse()
-        location = response.getheader('Location', None)
+    gay = random.randint(0, 1) == 1
+    headers = {
+        'Cookie': 'x_content_preference_index=s%3A3%3A%22gay%22%3B' if gay else ''
+    }
 
-        if response.status != 302 or location is None:
-            raise ValueError()
+    for attempt in range(0, max_tries):
+        try:
+            connection = http.client.HTTPConnection('xhamster.com')
+            connection.request('HEAD', '/random.php', headers=headers)
+            response = connection.getresponse()
+            location = response.getheader('Location', None)
 
-        return location
-    except http.client.HTTPException:
-        return 'connection failed, please try again later :('
-    except ValueError:
-        return 'unexpected headers, the fuckers changed their response :('
+            # sometimes their randomizer fails and redirects to the front page
+            if response.status == 302 and location is not None and location != 'http://xhamster.com':
+                return location
+        except http.client.HTTPException:
+            return 'connection failed, please try again later :('
+
+    return 'couldn\'t find a valid link in %i tries :(' % max_tries
 
 
 if __name__ == '__main__':
-    print('found: ' + reddit_link())
+    print('found: ' + xhamster_link())
