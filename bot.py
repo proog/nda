@@ -99,7 +99,7 @@ class Bot:
         line = self._readline()  # a line or None if nothing received
 
         if line is None:  # if no more lines and none received within timeout, check if it's time to talk
-            if self.idle_talk.can_talk():
+            if self.idle_talk.can_talk() and False:
                 self._send_message(self.channel, self.idle_talk.generate_message())
             return
 
@@ -170,7 +170,7 @@ class Bot:
             title = link_lookup.generic_lookup(message)
             if title is not None:
                 self._send_message(reply_target, '^^ \x02%s\x02' % title)
-        elif unit_converter.contains_unit(message):
+        elif unit_converter.contains_unit(message) and False:
             converted = unit_converter.convert_unit(message)
             if converted is not None:
                 self._send_message(reply_target, '^^ %.2f %s' % (converted[0], converted[1]))
