@@ -13,7 +13,11 @@ def run(args):
 
 
 def git_pull():
-    return subprocess.check_call(['git', 'pull']) == 0
+    try:
+        subprocess.check_call(['git', 'pull'])
+        return True
+    except subprocess.CalledProcessError:
+        return False
 
 
 def restart(file):
