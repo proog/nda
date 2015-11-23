@@ -20,6 +20,7 @@ class Bot:
     crlf = '\r\n'
     lines = []
     unfinished_line = ''
+    nick_index = 0
     idle_talk = None
     quotes = None
 
@@ -29,7 +30,7 @@ class Bot:
             self.address = conf['address']
             self.port = conf['port'] if 'port' in conf.keys() else 6667
             self.user = conf['user']
-            self.nick = conf['nick']
+            self.nicks = conf['nicks']
             self.real_name = conf['real_name']
             self.channel = conf['channel']
             self.nickserv_password = conf['nickserv_password'] if 'nickserv_password' in conf.keys() else None
@@ -48,6 +49,9 @@ class Bot:
 
     def _pong(self, msg):
         self._send('PONG :%s' % msg)
+
+    def _change_nick(self, nick):
+        self._send('NICK %s' % nick)
 
     def _log(self, msg):
         msg = '%s %s' % (datetime.datetime.utcnow(), msg)
@@ -82,8 +86,8 @@ class Bot:
         self._log('Connecting to %s:%s' % (self.address, self.port))
         self.irc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.irc.connect((self.address, self.port))
-        self._send('NICK %s' % self.nick)
         self._send('USER %s 8 * :%s' % (self.user, self.real_name))
+        self._change_nick(self.nicks[self.nick_index])
 
     def _disconnect(self):
         self._log('Disconnecting from %s:%s' % (self.address, self.port))
@@ -122,6 +126,12 @@ class Bot:
                 if self.nickserv_password is not None:
                     self._send_message('NickServ', 'IDENTIFY %s' % self.nickserv_password)
                 self._send('JOIN %s' % self.channel)
+            elif command == '433':  # ERR_NICKNAMEINUSE: nick already taken
+                self.nick_index += 1
+                if self.nick_index >= len(self.nicks):
+                    self._log('Error: all nicks already in use')
+                    raise KeyboardInterrupt
+                self._change_nick(self.nicks[self.nick_index])
             elif command == 'PRIVMSG':
                 target = data[2]
                 reply_target = target if target.startswith('#') else source_nick  # channel or direct message
