@@ -93,7 +93,9 @@ def xhamster_comment(link):
         def handle_data(self, data):
             if not self.in_comment:
                 return
-            self.comments.append(data)
+            cleaned = data.replace('\r', '').replace('\n', '').replace('\\', '').strip()
+            if cleaned.isprintable() and len(cleaned) > 0:
+                self.comments.append(cleaned)
 
         def error(self, message):
             pass
@@ -112,4 +114,5 @@ def xhamster_comment(link):
 
 if __name__ == '__main__':
     print(youtube_lookup('https://www.youtube.com/watch?v=g6QW-rFtKfA&feature=youtu.be&t=1529'))
-    print(generic_lookup('hi here is a link for you https://permortensen.com/about'))
+    #print(generic_lookup('hi here is a link for you https://permortensen.com/about'))
+    #print(xhamster_comment('http://xhamster.com/movies/3949336/merry_christmas_and_happy_new_year.html'))

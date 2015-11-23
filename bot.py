@@ -164,7 +164,6 @@ class Bot:
             return
         elif message.lower() == '!update' and source_nick in self.trusted_nicks:
             if shell.git_pull():
-                self._send_message(reply_target, 'pull succeeded, restarting')
                 self._disconnect()
                 time.sleep(5)  # give the server time to process disconnection to prevent nick collision
                 shell.restart(__file__)
