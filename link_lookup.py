@@ -106,17 +106,8 @@ def xhamster_comment(link):
     except:
         return None
 
-    all_comments = parser.comments
-
-    if len(all_comments) > 0:
-        wordy_comments = [x for x in all_comments if len(x.split()) > 10]
-
-        if len(wordy_comments) > 0:
-            return wordy_comments[random.randint(0, len(wordy_comments) - 1)]
-        else:
-            return all_comments[random.randint(0, len(all_comments) - 1)]
-
-    return None
+    comments = sorted(parser.comments, key=lambda x: len(x), reverse=True)
+    return comments[0] if len(comments) > 0 else None
 
 
 if __name__ == '__main__':
