@@ -44,8 +44,16 @@ class Bot:
         self.irc.send(msg.encode('utf-8'))
 
     def _send_message(self, to, msg):
-        self._log('Sending %s to %s' % (msg.strip(self.crlf), to))
-        self._send('PRIVMSG %s :%s' % (to, msg))
+        msg = msg.strip(self.crlf)
+        self._log('Sending %s to %s' % (msg, to))
+        command = 'PRIVMSG %s :' % to
+
+        # irc max line length is 512, but server -> other clients will tack on a :source, so let's be conservative
+        chunk_size = 512 - len(command + self.crlf) - 100
+        chunks = [msg[i:i + chunk_size] for i in range(0, len(msg), chunk_size)]
+
+        for chunk in chunks:
+            self._send(command + chunk + self.crlf)
 
     def _pong(self, msg):
         self._send('PONG :%s' % msg)
@@ -76,7 +84,7 @@ class Bot:
 
         # if buffer ended on newline, the last element will be empty string
         # otherwise, the last element will be an unfinished line
-        # if no newlines found in buffer, the entire buffer is an unfinished line (line longer than buffer_size)
+        # if no newlines found in buffer, the entire buffer is an unfinished line (line longer than what recv returned)
         self.unfinished_line = lines.pop(-1)
         self.lines = lines
 
