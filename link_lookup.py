@@ -1,6 +1,8 @@
 import urllib.request
 import re
 import json
+import html.parser
+import random
 from urllib.error import *
 
 
@@ -72,6 +74,49 @@ def generic_lookup(message):
             return None
     except (HTTPError, URLError):
         return None
+
+
+def xhamster_comment(link):
+    class Parser(html.parser.HTMLParser):
+        comments = []
+        in_comments_block = False
+        in_comment = False
+
+        def handle_starttag(self, tag, attrs):
+            if tag == 'div' and ('id', 'commentList') in attrs:
+                self.in_comments_block = True
+            self.in_comment = self.in_comments_block and tag == 'div' and ('class', 'oh') in attrs
+
+        def handle_endtag(self, tag):
+            self.in_comment = False
+
+        def handle_data(self, data):
+            if not self.in_comment:
+                return
+            self.comments.append(data)
+
+        def error(self, message):
+            pass
+
+    parser = Parser()
+
+    try:
+        response = urllib.request.urlopen(link)
+        parser.feed(response.read().decode('utf-8'))
+    except:
+        return None
+
+    all_comments = parser.comments
+
+    if len(all_comments) > 0:
+        wordy_comments = [x for x in all_comments if len(x.split()) > 10]
+
+        if len(wordy_comments) > 0:
+            return wordy_comments[random.randint(0, len(wordy_comments) - 1)]
+        else:
+            return all_comments[random.randint(0, len(all_comments) - 1)]
+
+    return None
 
 
 if __name__ == '__main__':

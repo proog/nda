@@ -152,7 +152,12 @@ class Bot:
             self._send_message(reply_target, link_generator.reddit_link())
             return
         elif message.lower() == '!porn':
-            self._send_message(reply_target, link_generator.xhamster_link())
+            link = link_generator.xhamster_link()
+            self._send_message(reply_target, link)
+            if link.startswith('http://'):
+                comment = link_lookup.xhamster_comment(link)
+                if comment is not None:
+                    self._send_message(reply_target, comment)
             return
         elif tokens[0] == '!quote' and False:
             self._send_message(reply_target, self.quotes.random_quote(tokens[1] if len(tokens) > 1 else None))
