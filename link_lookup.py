@@ -100,7 +100,7 @@ def xhamster_comment(link):
         def error(self, message):
             pass
 
-    parser = Parser()
+    parser = Parser(convert_charrefs=True)
 
     try:
         response = urllib.request.urlopen(link)
