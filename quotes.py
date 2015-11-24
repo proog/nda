@@ -52,10 +52,12 @@ class Quotes:
         cursor = self.db.cursor()
 
         if author is None:
-            cursor.execute('SELECT time, author, message FROM %s ORDER BY RANDOM() LIMIT 1' % self.table_name)
+            cursor.execute('SELECT time, author, message FROM %s WHERE RANDOM() < 200 / (SELECT COUNT(1) FROM %s) ORDER BY RANDOM() LIMIT 1'
+                           % (self.table_name, self.table_name))
         else:
             author = self.normalize_nick(author)
-            cursor.execute('SELECT time, author, message FROM %s WHERE author=? ORDER BY RANDOM() LIMIT 1' % self.table_name, (author,))
+            cursor.execute('SELECT time, author, message FROM %s WHERE author=? AND RANDOM() < 200 / (SELECT COUNT(1) FROM %s) ORDER BY RANDOM() LIMIT 1'
+                           % (self.table_name, self.table_name), (author,))
 
         row = cursor.fetchone()
 
@@ -145,5 +147,5 @@ if __name__ == '__main__':
     #        print('%s %i' % (nick, msg_count))
     #q.add_quote(0, 'ashin', '( ͡° ͜ʖ ͡°)')
     #q.import_irssi_log('gclogs/#garachat-master.log', 0)
-    print(q.random_quote('chewey'))
+    print(q.random_quote())
     q.close()
