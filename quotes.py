@@ -53,7 +53,7 @@ class Quotes:
         if author is None:
             cursor.execute('SELECT time, author, message FROM %s WHERE word_count > 2 ORDER BY RANDOM() LIMIT 1' % self.table_name)
         else:
-            author = author.lower()
+            author = self.normalize_nick(author)
             cursor.execute('SELECT time, author, message FROM %s WHERE author=? AND word_count>? ORDER BY RANDOM() LIMIT 1' % self.table_name, (author, 2))
 
         row = cursor.fetchone()
@@ -143,6 +143,6 @@ if __name__ == '__main__':
     #    if nick not in q.aliases.keys():
     #        print('%s %i' % (nick, msg_count))
     #q.add_quote(0, 'ashin', '( ͡° ͜ʖ ͡°)')
-    q.import_irssi_log('gclogs/#garachat-master.log', 0)
-    #print(q.random_quote('duo'))
+    #q.import_irssi_log('gclogs/#garachat-master.log', 0)
+    print(q.random_quote('chewey'))
     q.close()

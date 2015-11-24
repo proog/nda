@@ -167,7 +167,7 @@ class Bot:
                 if comment is not None:
                     self._send_message(reply_target, comment)
             return
-        elif tokens[0] == '!quote' and False:
+        elif tokens[0] == '!quote':
             self._send_message(reply_target, self.quotes.random_quote(tokens[1] if len(tokens) > 1 else None))
             return
         elif message.lower() == '!update' and source_nick in self.trusted_nicks:
