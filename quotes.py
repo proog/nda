@@ -17,6 +17,7 @@ class Quotes:
         self.table_name = channel.replace('#', '').strip()
         cursor = self.db.cursor()
         cursor.execute('CREATE TABLE IF NOT EXISTS %s (id INTEGER PRIMARY KEY AUTOINCREMENT, time INTEGER, author TEXT, message TEXT, word_count INTEGER)' % self.table_name)
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_time ON %s (time)' % self.table_name)
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_author ON %s (author)' % self.table_name)
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_word_count ON %s (word_count)' % self.table_name)
         self.db.commit()
@@ -35,7 +36,7 @@ class Quotes:
         message = message.rstrip()  # remove trailing whitespace from message
         word_count = len(message.split())
 
-        if timestamp == 0 or len(author) == 0 or len(message) == 0 or author in self.ignore_nicks:
+        if timestamp == 0 or len(author) == 0 or len(message) == 0 or author in self.ignore_nicks or word_count < 5:
             return False
 
         cursor = self.db.cursor()
