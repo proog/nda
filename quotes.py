@@ -52,10 +52,10 @@ class Quotes:
         cursor = self.db.cursor()
 
         if author is None:
-            cursor.execute('SELECT time, author, message FROM %s WHERE word_count > 2 ORDER BY RANDOM() LIMIT 1' % self.table_name)
+            cursor.execute('SELECT time, author, message FROM %s ORDER BY RANDOM() LIMIT 1' % self.table_name)
         else:
             author = self.normalize_nick(author)
-            cursor.execute('SELECT time, author, message FROM %s WHERE author=? AND word_count>? ORDER BY RANDOM() LIMIT 1' % self.table_name, (author, 2))
+            cursor.execute('SELECT time, author, message FROM %s WHERE author=? ORDER BY RANDOM() LIMIT 1' % self.table_name, (author,))
 
         row = cursor.fetchone()
 
