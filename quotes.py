@@ -83,15 +83,12 @@ class Quotes:
                     print('processing line %i' % lines)
 
                 line = line.strip()
-                date_match = re.match(r'^--- Day changed .{3} (.+)$', line)
+                date_match = re.match(r'^--- Day changed .{3} (\w{3}) (\d{2}) (\d{4})$', line)
                 date_match2 = re.match(r'^--- Log opened .{3} (\w{3}) (\d{2}) .{8} (\d{4})$', line)
+                date_match = date_match if date_match is not None else date_match2
 
                 if date_match is not None:
-                    date_str = '%s %s' % (date_match.group(1), utc_offset_padded)
-                    log_date = datetime.strptime(date_str, '%b %d %Y %z')
-                    continue
-                elif date_match2 is not None:
-                    date_str = '%s %s %s %s' % (date_match2.group(1), date_match2.group(2), date_match2.group(3), utc_offset_padded)
+                    date_str = '%s %s %s %s' % (date_match.group(1), date_match.group(2), date_match.group(3), utc_offset_padded)
                     log_date = datetime.strptime(date_str, '%b %d %Y %z')
                     continue
 
@@ -109,6 +106,7 @@ class Quotes:
                 if self.add_quote(timestamp, author, message, False):
                     imported += 1
                 else:
+                    print('Skipped message: <%s> %s' % (author, message))
                     skipped += 1
 
         self.db.commit()  # do a final commit if some insertions were left over
