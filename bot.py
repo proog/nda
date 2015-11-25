@@ -9,6 +9,7 @@ import link_generator
 import link_lookup
 import unit_converter
 import shell
+import re
 from idle_talk import IdleTalk
 from quotes import Quotes
 
@@ -168,7 +169,17 @@ class Bot:
                     self._send_message(reply_target, comment)
             return
         elif tokens[0] == '!quote':
-            self._send_message(reply_target, self.quotes.random_quote(tokens[1] if len(tokens) > 1 else None))
+            author = None
+            year = None
+            if len(tokens) > 1:
+                arg = tokens[1]
+                if re.match(r'^\d{4}$', arg) is not None:
+                    year = int(arg)
+                else:
+                    author = arg
+            if len(tokens) > 2 and author is not None and year is None:
+                year = tokens[2]
+            self._send_message(reply_target, self.quotes.random_quote(author, year))
             return
         elif message.lower() == '!update' and source_nick in self.trusted_nicks:
             if shell.git_pull():

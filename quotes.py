@@ -2,6 +2,7 @@ import sqlite3
 import re
 import json
 import random
+import sys
 from datetime import datetime, timezone
 
 
@@ -49,28 +50,47 @@ class Quotes:
 
         return True  # return true if the quote was added
 
-    def random_quote(self, author=None):
+    def random_quote(self, author=None, year=None):
         cursor = self.db.cursor()
+        err_msg = 'no quotes found :('
+        time_min = 0
+        time_max = sys.maxsize
+
+        if year is not None:
+            if year not in range(1970, datetime.utcnow().year + 1):
+                return err_msg
+            time_min = int(datetime(year, 1, 1, 0, 0, 0).timestamp())
+            time_max = int(datetime(year, 12, 31, 23, 59, 59).timestamp())
 
         if author is None:
-            cursor.execute('SELECT COUNT(*) FROM %s' % self.table_name)
-            random_skip = random.randint(0, cursor.fetchone()[0] - 1)
-            cursor.execute('SELECT time, author, message FROM %s LIMIT %i,1' % (self.table_name, random_skip))
+            cursor.execute('SELECT COUNT(*) FROM %s WHERE time>=? AND time<=?' % self.table_name, (time_min, time_max))
+            rows = cursor.fetchone()[0]
+
+            if rows == 0:
+                return err_msg
+
+            random_skip = random.randint(0, rows - 1)
+            cursor.execute('SELECT time, author, message FROM %s WHERE time>=? AND time<=? LIMIT %i,1' % (self.table_name, random_skip), (time_min, time_max))
         else:
             author = self.normalize_nick(author)
-            cursor.execute('SELECT COUNT(*) FROM %s WHERE author=?' % self.table_name, (author,))
-            random_skip = random.randint(0, cursor.fetchone()[0] - 1)
-            cursor.execute('SELECT time, author, message FROM %s WHERE author=? LIMIT %i,1' % (self.table_name, random_skip), (author,))
+            cursor.execute('SELECT COUNT(*) FROM %s WHERE author=? AND time>=? AND time<=?' % self.table_name, (author, time_min, time_max))
+            rows = cursor.fetchone()[0]
+
+            if rows == 0:
+                return err_msg
+
+            random_skip = random.randint(0, rows - 1)
+            cursor.execute('SELECT time, author, message FROM %s WHERE author=? AND time>=? AND time<=? LIMIT %i,1' % (self.table_name, random_skip), (author, time_min, time_max))
 
         row = cursor.fetchone()
 
-        if row is not None:
-            date = datetime.utcfromtimestamp(row[0]).strftime('%b %d %Y')
-            author = row[1]
-            message = row[2]
-            return '%s -- %s, %s' % (message, author, date)
+        if row is None:
+            return err_msg
 
-        return 'no quotes found :(' if author is None else 'no quotes found for %s :(' % author
+        date = datetime.utcfromtimestamp(row[0]).strftime('%b %d %Y')
+        author = row[1]
+        message = row[2]
+        return '%s -- %s, %s' % (message, author, date)
 
     def import_irssi_log(self, filename, utc_offset=0):
         utc_offset_padded = ('+' if utc_offset >= 0 else '') + str(utc_offset).zfill(2 if utc_offset >= 0 else 3) + '00'
@@ -150,5 +170,5 @@ if __name__ == '__main__':
     #        print('%s %i' % (nick, msg_count))
     #q.add_quote(0, 'ashin', '( ͡° ͜ʖ ͡°)')
     #q.import_irssi_log('gclogs/#garachat-master.log', 0)
-    print(q.random_quote())
+    print(q.random_quote(author='ashin', year=2010))
     q.close()
