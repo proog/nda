@@ -178,7 +178,9 @@ class Bot:
                 else:
                     author = arg
             if len(tokens) > 2 and author is not None and year is None:
-                year = int(tokens[2])
+                arg = tokens[2]
+                if re.match(r'^\d{4}$', arg) is not None:
+                    year = int(arg)
             self._send_message(reply_target, self.quotes.random_quote(author, year))
             return
         elif message.lower() == '!update' and source_nick in self.trusted_nicks:
