@@ -117,10 +117,10 @@ def xhamster_comment(link):
         response = urllib.request.urlopen(request)
         parser.feed(response.read().decode('utf-8'))
     except:
-        return None
+        return 'couldn\'t load comments :('
 
     comments = sorted(parser.comments, key=lambda x: len(x), reverse=True)
-    return comments[0] if len(comments) > 0 else None
+    return comments[0] if len(comments) > 0 else 'no comments :('
 
 
 if __name__ == '__main__':
