@@ -1,6 +1,7 @@
 import sqlite3
 import re
 import json
+import random
 from datetime import datetime, timezone
 
 
@@ -52,12 +53,14 @@ class Quotes:
         cursor = self.db.cursor()
 
         if author is None:
-            cursor.execute('SELECT time, author, message FROM %s WHERE RANDOM() < 200 / (SELECT COUNT(1) FROM %s) ORDER BY RANDOM() LIMIT 1'
-                           % (self.table_name, self.table_name))
+            cursor.execute('SELECT COUNT(*) FROM %s' % self.table_name)
+            random_skip = random.randint(0, cursor.fetchone()[0] - 1)
+            cursor.execute('SELECT time, author, message FROM %s LIMIT %i,1' % (self.table_name, random_skip))
         else:
             author = self.normalize_nick(author)
-            cursor.execute('SELECT time, author, message FROM %s WHERE author=? AND RANDOM() < 200 / (SELECT COUNT(1) FROM %s) ORDER BY RANDOM() LIMIT 1'
-                           % (self.table_name, self.table_name), (author,))
+            cursor.execute('SELECT COUNT(*) FROM %s WHERE author=?' % self.table_name, (author,))
+            random_skip = random.randint(0, cursor.fetchone()[0] - 1)
+            cursor.execute('SELECT time, author, message FROM %s WHERE author=? LIMIT %i,1' % (self.table_name, random_skip), (author,))
 
         row = cursor.fetchone()
 
