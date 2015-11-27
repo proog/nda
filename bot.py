@@ -14,6 +14,10 @@ from idle_talk import IdleTalk
 from quotes import Quotes
 
 
+class IRCError(Exception):
+    pass
+
+
 class Bot:
     irc = None
     buffer_size = 1024
@@ -125,7 +129,7 @@ class Bot:
             if command == 'PING':
                 self._pong(' '.join(data[1:]).lstrip(':'))
             elif command == 'ERROR':
-                raise ValueError('Received ERROR from server (%s)' % line)
+                raise IRCError('Received ERROR from server (%s)' % line)
         if len(data) > 3:
             source = data[0].lstrip(':')
             source_nick = source.split('!')[0]
@@ -146,6 +150,24 @@ class Bot:
                 reply_target = target if target.startswith('#') else source_nick  # channel or direct message
                 message = ' '.join(data[3:]).strip().lstrip(':')
                 self._parse_message(message, reply_target, source_nick)
+
+    def _parse_quote_command(self, tokens):
+        author = None
+        year = None
+
+        if len(tokens) > 1:
+            arg = tokens[1]
+            if re.match(r'^\d{4}$', arg) is not None:
+                year = int(arg)
+            else:
+                author = arg
+
+        if len(tokens) > 2 and author is not None and year is None:
+            arg = tokens[2]
+            if re.match(r'^\d{4}$', arg) is not None:
+                year = int(arg)
+
+        return author, year
 
     def _parse_message(self, message, reply_target, source_nick):
         tokens = message.split()
@@ -169,20 +191,14 @@ class Bot:
                     self._send_message(reply_target, comment)
             return
         elif tokens[0] == '!quote':
-            author = None
-            year = None
-            if len(tokens) > 1:
-                arg = tokens[1]
-                if re.match(r'^\d{4}$', arg) is not None:
-                    year = int(arg)
-                else:
-                    author = arg
-            if len(tokens) > 2 and author is not None and year is None:
-                arg = tokens[2]
-                if re.match(r'^\d{4}$', arg) is not None:
-                    year = int(arg)
-            self._send_message(reply_target, self.quotes.random_quote(author, year))
+            (author, year) = self._parse_quote_command(tokens)
+            quote = self.quotes.random_quote(author, year)
+            self._send_message(reply_target, quote if quote is not None else 'no quotes found :(')
             return
+        elif tokens[0] == '!quotecount':
+            (author, year) = self._parse_quote_command(tokens)
+            count = self.quotes.quote_count(author, year)
+            self._send_message(reply_target, '%i quotes' % count)
         elif message.lower() == '!update' and source_nick in self.trusted_nicks:
             if shell.git_pull():
                 self._disconnect()
@@ -229,16 +245,18 @@ class Bot:
         while True:  # keep trying to run the main loop even after errors occur
             try:
                 self._main_loop()
-            except ValueError as irc_error:
-                self._log('Error received from the server: %s' % irc_error.args)
+            except IRCError as irc_error:
+                self._log('ERROR received from the server: %s' % irc_error.args)
                 self._disconnect()
                 time.sleep(5)
             except OSError as os_error:
-                self._log('An error occurred (%i): %s' % (os_error.errno, os_error.strerror))
+                self._log('An OS error occurred (%i): %s' % (os_error.errno, os_error.strerror))
                 time.sleep(5)
             except KeyboardInterrupt:
                 self._disconnect()
                 break
+            except Exception as error:
+                self._log('An unknown error occurred: %s' % error.args)
 
 
 if __name__ == '__main__':

@@ -24,7 +24,7 @@ class Quotes:
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_word_count ON %s (word_count)' % self.table_name)
         self.db.commit()
 
-    def normalize_nick(self, nick):
+    def _normalize_nick(self, nick):
         nick = nick.lower().strip('_ ') # try to normalize nicks to lowercase versions and no alts
 
         for (master, aliases) in self.aliases.items():
@@ -33,8 +33,18 @@ class Quotes:
 
         return nick
 
+    def _year_to_timestamps(self, year):
+        if year is None:
+            return 0, sys.maxsize
+        elif year not in range(1970, datetime.utcnow().year + 1):
+            return None
+
+        time_min = int(datetime(year, 1, 1, 0, 0, 0).timestamp())
+        time_max = int(datetime(year, 12, 31, 23, 59, 59).timestamp())
+        return time_min, time_max
+
     def add_quote(self, timestamp, author, message, commit=True):
-        author = self.normalize_nick(author)
+        author = self._normalize_nick(author)
         message = message.rstrip()  # remove trailing whitespace from message
         word_count = len(message.split())
 
@@ -51,46 +61,50 @@ class Quotes:
         return True  # return true if the quote was added
 
     def random_quote(self, author=None, year=None):
+        time_tuple = self._year_to_timestamps(year)
+        num_rows = self.quote_count(author, year)
+
+        if time_tuple is None or num_rows == 0:
+            return None
+
+        random_skip = random.randint(0, num_rows - 1)
+        params = time_tuple
+        query = 'SELECT time, author, message FROM %s WHERE time>=? AND time<=?' % self.table_name
+
+        if author is not None:
+            author = self._normalize_nick(author)
+            query += ' AND author=?'
+            params += (author,)
+
+        query += ' LIMIT 1 OFFSET %i' % random_skip
+
         cursor = self.db.cursor()
-        err_msg = 'no quotes found :('
-        time_min = 0
-        time_max = sys.maxsize
+        cursor.execute(query, params)
 
-        if year is not None:
-            if year not in range(1970, datetime.utcnow().year + 1):
-                return err_msg
-            time_min = int(datetime(year, 1, 1, 0, 0, 0).timestamp())
-            time_max = int(datetime(year, 12, 31, 23, 59, 59).timestamp())
+        (timestamp, author, message) = cursor.fetchone()
+        date = datetime.utcfromtimestamp(timestamp).strftime('%b %d %Y')
 
-        if author is None:
-            cursor.execute('SELECT COUNT(*) FROM %s WHERE time>=? AND time<=?' % self.table_name, (time_min, time_max))
-            rows = cursor.fetchone()[0]
-
-            if rows == 0:
-                return err_msg
-
-            random_skip = random.randint(0, rows - 1)
-            cursor.execute('SELECT time, author, message FROM %s WHERE time>=? AND time<=? LIMIT %i,1' % (self.table_name, random_skip), (time_min, time_max))
-        else:
-            author = self.normalize_nick(author)
-            cursor.execute('SELECT COUNT(*) FROM %s WHERE author=? AND time>=? AND time<=?' % self.table_name, (author, time_min, time_max))
-            rows = cursor.fetchone()[0]
-
-            if rows == 0:
-                return err_msg
-
-            random_skip = random.randint(0, rows - 1)
-            cursor.execute('SELECT time, author, message FROM %s WHERE author=? AND time>=? AND time<=? LIMIT %i,1' % (self.table_name, random_skip), (author, time_min, time_max))
-
-        row = cursor.fetchone()
-
-        if row is None:
-            return err_msg
-
-        date = datetime.utcfromtimestamp(row[0]).strftime('%b %d %Y')
-        author = row[1]
-        message = row[2]
         return '%s -- %s, %s' % (message, author, date)
+
+    def quote_count(self, author=None, year=None):
+        time_tuple = self._year_to_timestamps(year)
+
+        if time_tuple is None:
+            return 0
+
+        query = 'SELECT COUNT(*) FROM %s WHERE time>=? AND time<=?' % self.table_name
+        params = time_tuple
+
+        if author is not None:
+            author = self._normalize_nick(author)
+            query += ' AND author=?'
+            params += (author,)
+
+        cursor = self.db.cursor()
+        cursor.execute(query, params)
+        (count,) = cursor.fetchone()
+
+        return int(count)
 
     def import_irssi_log(self, filename, utc_offset=0):
         utc_offset_padded = ('+' if utc_offset >= 0 else '') + str(utc_offset).zfill(2 if utc_offset >= 0 else 3) + '00'
@@ -151,7 +165,7 @@ class Quotes:
                 if match is None:
                     continue
 
-                author = self.normalize_nick(match.group(3))
+                author = self._normalize_nick(match.group(3))
 
                 if author not in authors.keys():
                     authors[author] = 0
@@ -171,4 +185,5 @@ if __name__ == '__main__':
     #q.add_quote(0, 'ashin', '( ͡° ͜ʖ ͡°)')
     #q.import_irssi_log('gclogs/#garachat-master.log', 0)
     print(q.random_quote(author='ashin', year=2010))
+    print(q.quote_count(author='sarah'))
     q.close()
