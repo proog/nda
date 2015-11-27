@@ -228,8 +228,9 @@ class Bot:
             if converted is not None:
                 self._send_message(reply_target, '^^ %.2f %s' % (converted[0], converted[1]))
 
-        self.idle_talk.add_message(message)  # add message to the idle talk log
-        self.quotes.add_quote(int(time.time()), source_nick, message)  # add message to the quotes database
+        if reply_target == self.channel:
+            self.idle_talk.add_message(message)  # add message to the idle talk log
+            self.quotes.add_quote(int(time.time()), source_nick, message)  # add message to the quotes database
 
     def _main_loop(self):
         self.lines = []
