@@ -28,6 +28,7 @@ class Bot:
     nick_index = 0
     idle_talk = None
     quotes = None
+    connect_time = None
 
     def __init__(self, conf_file):
         with open(conf_file, 'r', encoding='utf-8') as f:
@@ -49,6 +50,9 @@ class Bot:
         self.irc.send(msg.encode('utf-8'))
 
     def _send_message(self, to, msg):
+        if msg is None or len(msg) == 0:
+            return
+
         msg = msg.strip(self.crlf)
         self._log('Sending %s to %s' % (msg, to))
         command = 'PRIVMSG %s :' % to
@@ -99,6 +103,7 @@ class Bot:
         self._log('Connecting to %s:%s' % (self.address, self.port))
         self.irc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.irc.connect((self.address, self.port))
+        self.connect_time = datetime.datetime.utcnow()
         self._send('USER %s 8 * :%s' % (self.user, self.real_name))
         self._change_nick(self.nicks[self.nick_index])
 
@@ -136,7 +141,7 @@ class Bot:
             command = data[1]
 
             if command == '001':  # RPL_WELCOME: successful client registration
-                if self.nickserv_password is not None:
+                if self.nickserv_password is not None and len(self.nickserv_password) > 0:
                     self._send_message('NickServ', 'IDENTIFY %s' % self.nickserv_password)
                 self._send('JOIN %s' % self.channel)
             elif command == '433':  # ERR_NICKNAMEINUSE: nick already taken
@@ -151,86 +156,123 @@ class Bot:
                 message = ' '.join(data[3:]).strip().lstrip(':')
                 self._parse_message(message, reply_target, source_nick)
 
-    def _parse_quote_command(self, tokens):
-        author = None
-        year = None
-
-        if len(tokens) > 1:
-            arg = tokens[1]
-            if re.match(r'^\d{4}$', arg) is not None:
-                year = int(arg)
-            else:
-                author = arg
-
-        if len(tokens) > 2 and author is not None and year is None:
-            arg = tokens[2]
-            if re.match(r'^\d{4}$', arg) is not None:
-                year = int(arg)
-
-        return author, year
-
     def _parse_message(self, message, reply_target, source_nick):
         tokens = message.split()
 
         # explicit commands
-        if message.lower() == '!hi':
-            self._send_message(reply_target, 'hi %s' % source_nick)
-            return
-        elif message.lower() == '!imgur':
-            self._send_message(reply_target, link_generator.imgur_link())
-            return
-        elif message.lower() == '!reddit':
-            self._send_message(reply_target, link_generator.reddit_link())
-            return
-        elif message.lower() == '!porn':
+        handled = self._explicit_command(tokens[0], tokens[1:] if len(tokens) > 1 else [], reply_target, source_nick)
+
+        if not handled:
+            # implicit commands
+            self._implicit_command(message, reply_target, source_nick)
+
+            if reply_target == self.channel:
+                self.idle_talk.add_message(message)  # add message to the idle talk log
+                self.quotes.add_quote(int(datetime.datetime.utcnow().timestamp()), source_nick, message)  # add message to the quotes database
+
+    def _explicit_command(self, command, args, reply_target, source_nick):
+        def parse_quote_command():
+            author = None
+            year = None
+
+            if len(args) > 0:
+                arg = args[1]
+                if re.match(r'^\d{4}$', arg) is not None:
+                    year = int(arg)
+                else:
+                    author = arg
+            if len(args) > 1 and author is not None and year is None:
+                arg = args[2]
+                if re.match(r'^\d{4}$', arg) is not None:
+                    year = int(arg)
+
+            return author, year
+
+        def uptime():
+            connect_time = self.connect_time.strftime('%Y-%m-%d %H:%M:%S')
+            uptime_str = str(datetime.datetime.utcnow() - self.connect_time)
+            self._send_message(reply_target, 'connected on %s, %s ago' % (connect_time, uptime_str))
+
+        def porn():
             link = link_generator.xhamster_link()
             self._send_message(reply_target, link)
             if link.startswith('http://'):
                 comment = link_lookup.xhamster_comment(link)
-                if comment is not None:
-                    self._send_message(reply_target, comment)
-            return
-        elif tokens[0] == '!quote':
-            (author, year) = self._parse_quote_command(tokens)
-            quote = self.quotes.random_quote(author, year)
-            self._send_message(reply_target, quote if quote is not None else 'no quotes found :(')
-            return
-        elif tokens[0] == '!quotecount':
-            (author, year) = self._parse_quote_command(tokens)
+                self._send_message(reply_target, comment)
+
+        def quote():
+            author, year = parse_quote_command()
+            random_quote = self.quotes.random_quote(author, year)
+            self._send_message(reply_target, random_quote if random_quote is not None else 'no quotes found :(')
+
+        def quote_count():
+            author, year = parse_quote_command()
             count = self.quotes.quote_count(author, year)
             self._send_message(reply_target, '%i quotes' % count)
-        elif message.lower() == '!update' and source_nick in self.trusted_nicks:
-            if shell.git_pull():
-                self._disconnect()
-                time.sleep(5)  # give the server time to process disconnection to prevent nick collision
-                shell.restart(__file__)
-            else:
-                self._send_message(reply_target, 'pull failed wih non-zero return code :(')
-            return
-        elif message.startswith('!shell ') and source_nick in self.trusted_nicks and False:
-            shell_command = ''.join(message.split('!shell ')[1:])
-            output = shell.run(shell_command)
-            for line in output:
-                self._send_message(reply_target, line)
-            return
 
-        # link and unit lookups
-        if link_lookup.contains_youtube(message):
+        def update():
+            if source_nick in self.trusted_nicks:
+                if shell.git_pull():
+                    self._disconnect()
+                    time.sleep(5)  # give the server time to process disconnection to prevent nick collision
+                    shell.restart(__file__)
+                else:
+                    self._send_message(reply_target, 'pull failed wih non-zero return code :(')
+
+        def shell_command():
+            if source_nick in self.trusted_nicks and False:
+                for line in shell.run(' '.join(args)):
+                    self._send_message(reply_target, line)
+
+        command = command.lower()
+        commands = {
+            '!hi': lambda: self._send_message(reply_target, 'hi %s' % source_nick),
+            '!imgur': lambda: self._send_message(reply_target, link_generator.imgur_link()),
+            '!reddit': lambda: self._send_message(reply_target, link_generator.reddit_link()),
+            '!uptime': uptime,
+            '!porn': porn,
+            '!quote': quote,
+            '!quotecount': quote_count,
+            '!update': update,
+            '!shell': shell_command
+        }
+
+        if command in commands:
+            commands[command]()
+            return True
+
+        return False
+
+    def _implicit_command(self, message, reply_target, source_nick):
+        def youtube_lookup():
             title = link_lookup.youtube_lookup(message)
             if title is not None:
                 self._send_message(reply_target, '^^ \x02%s\x02' % title)  # 0x02 == control character for bold text
-        elif link_lookup.contains_link(message) and False:
+
+        def generic_lookup():
             title = link_lookup.generic_lookup(message)
             if title is not None:
                 self._send_message(reply_target, '^^ \x02%s\x02' % title)
-        elif unit_converter.contains_unit(message) and False:
+
+        def convert_units():
             converted = unit_converter.convert_unit(message)
             if converted is not None:
-                self._send_message(reply_target, '^^ %.2f %s' % (converted[0], converted[1]))
+                value, unit = converted
+                self._send_message(reply_target, '^^ %.2f %s' % (value, unit))
 
-        if reply_target == self.channel:
-            self.idle_talk.add_message(message)  # add message to the idle talk log
-            self.quotes.add_quote(int(time.time()), source_nick, message)  # add message to the quotes database
+        matchers = [
+            ((lambda: link_lookup.contains_youtube(message)), youtube_lookup),
+            ((lambda: link_lookup.contains_link(message) and False), generic_lookup),
+            ((lambda: unit_converter.contains_unit(message) and False), convert_units)
+        ]
+
+        matched = False
+        for matcher, func in matchers:
+            if matcher():
+                func()
+                matched = True
+
+        return matched
 
     def _main_loop(self):
         self.lines = []
