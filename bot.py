@@ -12,6 +12,7 @@ import shell
 import re
 from idle_talk import IdleTalk
 from quotes import Quotes
+from videogames import Maze
 
 
 class IRCError(Exception):
@@ -28,6 +29,7 @@ class Bot:
     nick_index = 0
     idle_talk = None
     quotes = None
+    game = None
     connect_time = None
 
     def __init__(self, conf_file):
@@ -220,9 +222,13 @@ class Bot:
                     self._send_message(reply_target, 'pull failed wih non-zero return code :(')
 
         def shell_command():
-            if source_nick in self.trusted_nicks and False:
+            if source_nick in self.trusted_nicks:
                 for line in shell.run(' '.join(args)):
                     self._send_message(reply_target, line)
+
+        def multiline(lines):
+            for line in lines:
+                self._send_message(reply_target, line)
 
         command = command.lower()
         commands = {
@@ -234,7 +240,13 @@ class Bot:
             '!quote': quote,
             '!quotecount': quote_count,
             '!update': update,
-            '!shell': shell_command
+            # '!shell': shell_command,
+            '!up': lambda: multiline(self.game.up()),
+            '!down': lambda: multiline(self.game.down()),
+            '!left': lambda: multiline(self.game.left()),
+            '!right': lambda: multiline(self.game.right()),
+            '!look': lambda: multiline(self.game.look()),
+            '!restart': lambda: multiline(self.game.restart())
         }
 
         if command in commands:
@@ -279,6 +291,7 @@ class Bot:
         self.unfinished_line = ''
         self.idle_talk = IdleTalk()
         self.quotes = Quotes(self.channel)
+        self.game = Maze()
 
         self._connect()
         while True:
