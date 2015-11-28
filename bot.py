@@ -176,13 +176,13 @@ class Bot:
             year = None
 
             if len(args) > 0:
-                arg = args[1]
+                arg = args[0]
                 if re.match(r'^\d{4}$', arg) is not None:
                     year = int(arg)
                 else:
                     author = arg
             if len(args) > 1 and author is not None and year is None:
-                arg = args[2]
+                arg = args[1]
                 if re.match(r'^\d{4}$', arg) is not None:
                     year = int(arg)
 
