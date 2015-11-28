@@ -241,12 +241,12 @@ class Bot:
             '!quotecount': quote_count,
             '!update': update,
             # '!shell': shell_command,
-            '!up': lambda: multiline(self.game.up()),
-            '!down': lambda: multiline(self.game.down()),
-            '!left': lambda: multiline(self.game.left()),
-            '!right': lambda: multiline(self.game.right()),
-            '!look': lambda: multiline(self.game.look()),
-            '!restart': lambda: multiline(self.game.restart())
+            # '!up': lambda: multiline(self.game.up()),
+            # '!down': lambda: multiline(self.game.down()),
+            # '!left': lambda: multiline(self.game.left()),
+            # '!right': lambda: multiline(self.game.right()),
+            # '!look': lambda: multiline(self.game.look()),
+            # '!restart': lambda: multiline(self.game.restart())
         }
 
         if command in commands:
