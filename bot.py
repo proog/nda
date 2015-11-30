@@ -67,9 +67,11 @@ class Bot:
             self._send(command + chunk + self.crlf)
 
     def _pong(self, msg):
+        self._log('Sending PONG :%s' % msg)
         self._send('PONG :%s' % msg)
 
     def _change_nick(self, nick):
+        self._log('Sending NICK %s' % nick)
         self._send('NICK %s' % nick)
 
     def _log(self, msg):
@@ -136,7 +138,7 @@ class Bot:
             if command == 'PING':
                 self._pong(' '.join(data[1:]).lstrip(':'))
             elif command == 'ERROR':
-                raise IRCError('Received ERROR from server (%s)' % line)
+                raise IRCError(line)
         if len(data) > 3:
             source = data[0].lstrip(':')
             source_nick = source.split('!')[0]
