@@ -19,9 +19,9 @@ class Maze:
         LOOKED: 'you looked around :)'
     }
     status = NO_ACTION
-    level = []
 
     def __init__(self):
+        self.level = []
         self.restart()
 
     def _find_player(self):

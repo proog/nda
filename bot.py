@@ -12,7 +12,7 @@ import shell
 import re
 from idle_talk import IdleTalk
 from quotes import Quotes
-from videogames import Maze
+from maze import Maze
 
 
 class IRCError(Exception):
@@ -20,17 +20,9 @@ class IRCError(Exception):
 
 
 class Bot:
-    irc = None
     buffer_size = 1024
     receive_timeout = 10
     crlf = '\r\n'
-    lines = []
-    unfinished_line = ''
-    nick_index = 0
-    idle_talk = None
-    quotes = None
-    game = None
-    connect_time = None
 
     def __init__(self, conf_file):
         with open(conf_file, 'r', encoding='utf-8') as f:
@@ -45,6 +37,14 @@ class Bot:
             self.trusted_nicks = conf['trusted_nicks'] if 'trusted_nicks' in conf.keys() else []
             self.quit_message = conf['quit_message'] if 'quit_message' in conf.keys() else ''
             self.logging = conf['logging'] if 'logging' in conf.keys() else False
+        self.irc = None
+        self.lines = []
+        self.unfinished_line = ''
+        self.nick_index = 0
+        self.idle_talk = None
+        self.quotes = None
+        self.game = None
+        self.connect_time = None
 
     def _send(self, msg):
         if not msg.endswith(self.crlf):
