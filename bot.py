@@ -22,6 +22,7 @@ class IRCError(Exception):
 class Bot:
     buffer_size = 1024
     receive_timeout = 10
+    ping_timeout = 300
     crlf = '\r\n'
 
     def __init__(self, conf_file):
@@ -45,6 +46,7 @@ class Bot:
         self.quotes = None
         self.game = None
         self.connect_time = None
+        self.last_ping = None
 
     def _send(self, msg):
         if not msg.endswith(self.crlf):
@@ -108,6 +110,7 @@ class Bot:
         self.irc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.irc.connect((self.address, self.port))
         self.connect_time = datetime.datetime.utcnow()
+        self.last_ping = datetime.datetime.utcnow()
         self._send('USER %s 8 * :%s' % (self.user, self.real_name))
         self._change_nick(self.nicks[self.nick_index])
 
@@ -124,9 +127,15 @@ class Bot:
     def _receive(self):
         line = self._readline()  # a line or None if nothing received
 
-        if line is None:  # if no more lines and none received within timeout, check if it's time to talk
+        if line is None:
+            # if the server doesn't ping the client anymore, something strange happened (like a netsplit)
+            if (datetime.datetime.utcnow() - self.last_ping).total_seconds() > self.ping_timeout:
+                raise IRCError('No ping received from the server in %i seconds' % self.ping_timeout)
+
+            # check if it's time to talk
             if self.idle_talk.can_talk() and False:
                 self._send_message(self.channel, self.idle_talk.generate_message())
+
             return
 
         data = line.split()
@@ -136,6 +145,7 @@ class Bot:
             command = data[0]
 
             if command == 'PING':
+                self.last_ping = datetime.datetime.utcnow()
                 self._pong(' '.join(data[1:]).lstrip(':'))
             elif command == 'ERROR':
                 raise IRCError(line)
@@ -304,17 +314,17 @@ class Bot:
             try:
                 self._main_loop()
             except IRCError as irc_error:
-                self._log('ERROR received from the server: %s' % irc_error.args)
+                self._log('IRC error: %s' % irc_error.args)
                 self._disconnect()
                 time.sleep(5)
             except OSError as os_error:
-                self._log('An OS error occurred (%i): %s' % (os_error.errno, os_error.strerror))
+                self._log('OS error (errno %i): %s' % (os_error.errno, os_error.strerror))
                 time.sleep(5)
             except KeyboardInterrupt:
                 self._disconnect()
                 break
             except Exception as error:
-                self._log('An unknown error occurred: %s' % error.args)
+                self._log('Unknown error (%s): %s' % (str(type(error)), error.args))
 
 
 if __name__ == '__main__':
