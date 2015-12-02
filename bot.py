@@ -76,6 +76,10 @@ class Bot:
         self._log('Sending NICK %s' % nick)
         self._send('NICK %s' % nick)
 
+    def _join(self, channel):
+        self._log('Sending JOIN %s' % channel)
+        self._send('JOIN %s' % channel)
+
     def _log(self, msg):
         msg = '%s %s' % (datetime.datetime.utcnow(), msg)
 
@@ -157,13 +161,16 @@ class Bot:
             if command == '001':  # RPL_WELCOME: successful client registration
                 if self.nickserv_password is not None and len(self.nickserv_password) > 0:
                     self._send_message('NickServ', 'IDENTIFY %s' % self.nickserv_password)
-                self._send('JOIN %s' % self.channel)
+                self._join(self.channel)
             elif command == '433':  # ERR_NICKNAMEINUSE: nick already taken
                 self.nick_index += 1
                 if self.nick_index >= len(self.nicks):
                     self._log('Error: all nicks already in use')
                     raise KeyboardInterrupt
                 self._change_nick(self.nicks[self.nick_index])
+            elif command == 'KICK':
+                time.sleep(2)
+                self._join(self.channel)
             elif command == 'PRIVMSG':
                 target = data[2]
                 reply_target = target if target.startswith('#') else source_nick  # channel or direct message
