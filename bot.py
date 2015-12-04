@@ -259,6 +259,7 @@ class Bot:
             '!quote': quote,
             '!quotecount': quote_count,
             '!update': update,
+            '!isitmovienight': lambda: self._send_message(reply_target, 'yes :)' if datetime.datetime.utcnow().weekday() == 4 else 'no :(')
             # '!shell': shell_command,
             # '!up': lambda: multiline(self.game.up()),
             # '!down': lambda: multiline(self.game.down()),
