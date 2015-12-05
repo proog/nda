@@ -22,7 +22,7 @@ class IRCError(Exception):
 class Bot:
     buffer_size = 1024
     receive_timeout = 10
-    ping_timeout = 300
+    message_timeout = 600
     crlf = '\r\n'
 
     def __init__(self, conf_file):
@@ -46,7 +46,7 @@ class Bot:
         self.quotes = None
         self.game = None
         self.connect_time = None
-        self.last_ping = None
+        self.last_message = None
 
     def _send(self, msg):
         if not msg.endswith(self.crlf):
@@ -114,7 +114,7 @@ class Bot:
         self.irc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.irc.connect((self.address, self.port))
         self.connect_time = datetime.datetime.utcnow()
-        self.last_ping = datetime.datetime.utcnow()
+        self.last_message = datetime.datetime.utcnow()
         self._send('USER %s 8 * :%s' % (self.user, self.real_name))
         self._change_nick(self.nicks[self.nick_index])
 
@@ -132,9 +132,9 @@ class Bot:
         line = self._readline()  # a line or None if nothing received
 
         if line is None:
-            # if the server doesn't ping the client anymore, something strange happened (like a netsplit)
-            if (datetime.datetime.utcnow() - self.last_ping).total_seconds() > self.ping_timeout:
-                raise IRCError('No ping received from the server in %i seconds' % self.ping_timeout)
+            # if we don't receive any messages or pings for a while, something strange happened (like a netsplit)
+            if (datetime.datetime.utcnow() - self.last_message).total_seconds() > self.message_timeout:
+                raise IRCError('No message received from the server in %i seconds' % self.message_timeout)
 
             # check if it's time to talk
             if self.idle_talk.can_talk() and False:
@@ -144,12 +144,12 @@ class Bot:
 
         data = line.split()
         self._log(line)
+        self.last_message = datetime.datetime.utcnow()
 
         if len(data) > 1:
             command = data[0]
 
             if command == 'PING':
-                self.last_ping = datetime.datetime.utcnow()
                 self._pong(' '.join(data[1:]).lstrip(':'))
             elif command == 'ERROR':
                 raise IRCError(line)
