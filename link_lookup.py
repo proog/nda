@@ -54,25 +54,48 @@ def contains_link(message):
 
 
 def generic_lookup(message):
+    class Parser(html.parser.HTMLParser):
+        in_head = False
+        in_title = False
+        title = None
+
+        def handle_starttag(self, tag, attrs):
+            if tag == 'head':
+                self.in_head = True
+            self.in_title = self.in_head and tag == 'title'
+
+        def handle_endtag(self, tag):
+            if tag == 'head':
+                self.in_head = False
+            self.in_title = False
+
+        def handle_data(self, data):
+            if self.in_title:
+                self.title = data.replace('\r', '').replace('\n', '').strip()
+
+        def error(self, message):
+            pass
+
     link = extract_link(message)
 
     if link is None:
         return None
 
     try:
-        response = urllib.request.urlopen(link)
+        request = urllib.request.Request(link, headers={
+            'Accept-Language': 'en-US'  # to avoid geo-specific response language from e.g. twitter
+        })
+        response = urllib.request.urlopen(request)
 
-        if response.status != 200:
+        if response.status != 200 or 'text/html' not in response.getheader('Content-Type', '').lower():
             return None
 
-        data = response.read().decode('utf-8', errors='ignore').replace('\n', '')
-        title_match = re.search(r'.*<title>(.+)</title>.*', data, flags=re.IGNORECASE)
+        parser = Parser(convert_charrefs=True)
+        parser.feed(response.read().decode('utf-8'))
+        title = parser.title
 
-        if title_match is not None and len(title_match.groups()) == 1:
-            return title_match.group(1)
-        else:
-            return None
-    except (HTTPError, URLError):
+        return title if title is not None and len(title) > 0 else None
+    except (HTTPError, URLError, UnicodeDecodeError):
         return None
 
 
@@ -125,5 +148,5 @@ def xhamster_comment(link):
 
 if __name__ == '__main__':
     print(youtube_lookup('https://www.youtube.com/watch?v=g6QW-rFtKfA&feature=youtu.be&t=1529'))
-    #print(generic_lookup('hi here is a link for you https://permortensen.com/about'))
+    print(generic_lookup('hi here is a link for you https://twitter.com/qataraxia/status/672901207845961728'))
     #print(xhamster_comment('http://xhamster.com/movies/3949336/merry_christmas_and_happy_new_year.html'))

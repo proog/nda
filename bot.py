@@ -292,13 +292,13 @@ class Bot:
                 value, unit = converted
                 self._send_message(reply_target, '^^ %.2f %s' % (value, unit))
 
+        matched = False
         matchers = [
             ((lambda: link_lookup.contains_youtube(message)), youtube_lookup),
-            ((lambda: link_lookup.contains_link(message) and False), generic_lookup),
+            ((lambda: link_lookup.contains_link(message) and not matched), generic_lookup),  # skip if youtube link already matched
             ((lambda: unit_converter.contains_unit(message) and False), convert_units)
         ]
 
-        matched = False
         for matcher, func in matchers:
             if matcher():
                 func()
