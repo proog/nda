@@ -10,9 +10,11 @@ import link_lookup
 import unit_converter
 import shell
 import re
+import traceback
 from idle_talk import IdleTalk
 from quotes import Quotes
 from maze import Maze
+from rpg import rpg
 
 
 class IRCError(Exception):
@@ -82,9 +84,9 @@ class Bot:
 
     def _log(self, msg):
         msg = '%s %s' % (datetime.datetime.utcnow(), msg)
+        print(msg)
 
         if self.logging:
-            print(msg)
             with open('bot.log', 'a', encoding='utf-8') as f:
                 f.write('%s%s' % (msg, self.crlf))
 
@@ -249,6 +251,10 @@ class Bot:
             for line in lines:
                 self._send_message(reply_target, line)
 
+        def rpg_action():
+            if reply_target == self.channel:  # only allow rpg play in channel
+                multiline(self.rpg.action(' '.join(args)))
+
         command = command.lower()
         commands = {
             '!hi': lambda: self._send_message(reply_target, 'hi %s' % source_nick),
@@ -259,7 +265,8 @@ class Bot:
             '!quote': quote,
             '!quotecount': quote_count,
             '!update': update,
-            '!isitmovienight': lambda: self._send_message(reply_target, 'maybe :)' if datetime.datetime.utcnow().weekday() in [4, 5] else 'no :(')
+            '!isitmovienight': lambda: self._send_message(reply_target, 'maybe :)' if datetime.datetime.utcnow().weekday() in [4, 5] else 'no :('),
+            '!rpg': rpg_action
             # '!shell': shell_command,
             # '!up': lambda: multiline(self.game.up()),
             # '!down': lambda: multiline(self.game.down()),
@@ -312,6 +319,7 @@ class Bot:
         self.idle_talk = IdleTalk()
         self.quotes = Quotes(self.channel)
         self.game = Maze()
+        self.rpg = rpg.RPG()
 
         self._connect()
         while True:
@@ -333,6 +341,7 @@ class Bot:
                 break
             except Exception as error:
                 self._log('Unknown error (%s): %s' % (str(type(error)), error.args))
+                self._log(traceback.format_exc())
 
 
 if __name__ == '__main__':

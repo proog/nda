@@ -1,0 +1,53 @@
+[
+  {
+    "id": "dun_lair",
+    "name": "Lair of Liars",
+    "description": "don't believe these guys",
+    "enemies": {
+      "enm_dun1en1": 0.8,
+      "enm_dun1en2": 0.2
+    },
+    "boss": "enm_dun1BOSS"
+  },
+  {
+    "id": "dun_woods",
+    "name": "Spooky Woods",
+    "description": "a very spooky forest",
+    "enemies": {
+      "enm_dun2en1": 0.8,
+      "enm_dun2en2": 0.2
+    },
+    "boss": "enm_dun2BOSS"
+  },
+  {
+    "id": "dun_defright",
+    "name": "Dungeon of Defright",
+    "description": "no one knows about this place",
+    "enemies": {
+      "enm_blob": 1
+    },
+    "boss": "enm_dun3BOSS"
+  },
+  {
+    "id": "dun_thieves",
+    "name": "Thieves' Guild",
+    "description": "a hive of scum and villainy",
+    "enemies": {
+      "enm_thief": 0.8,
+      "enm_master_thief": 0.2
+    },
+    "boss": "enm_dun4BOSS"
+  },
+  {
+    "id": "dun_debugroom",
+    "name": "Debug Room",
+    "description": "veritable treasure box",
+    "enemies": {
+      "enm_debug1": 0.4,
+      "enm_debug2": 0.3,
+	  "enm_debug3": 0.3
+    }
+    ,
+    "boss": "enm_debugBOSS"
+  }
+]
