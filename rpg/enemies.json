@@ -27,24 +27,24 @@
     "id": "enm_dun2en1",
     "name": "Ghoul",
     "description": "weak strength enemy, spooky woods",
-    "hp": 51,
-    "atk": 17,
+    "hp": 53,
+    "atk": 21,
     "def": 5,
     "spd": 12,
     "multiplier": 1,
-    "exp": 112,
+    "exp": 212,
     "gold": 30
   },
   {
     "id": "enm_dun2en2",
     "name": "Skeleton",
     "description": "medium strength enemy, spooky woods.",
-    "hp": 68,
-    "atk": 23,
+    "hp": 73,
+    "atk": 24,
     "def": 8,
     "spd": 16,
     "multiplier": 1,
-    "exp": 202,
+    "exp": 402,
     "gold": 51
   },
   {
@@ -56,7 +56,7 @@
     "def": 8,
     "spd": 19,
     "multiplier": 1,
-    "exp": 401,
+    "exp": 701,
     "gold": 65
   },
   {
@@ -68,7 +68,7 @@
     "def": 9,
     "spd": 25,
     "multiplier": 1,
-    "exp": 600,
+    "exp": 1000,
     "gold": 71
   },
   {
@@ -80,7 +80,7 @@
     "def": 21,
     "spd": 2,
     "multiplier": 1,
-    "exp": 1211,
+    "exp": 3211,
     "gold": 120
   },
   {
@@ -152,7 +152,7 @@
     "def": 12,
     "spd": 33,
     "multiplier": 1,
-    "exp": 11260,
+    "exp": 41260,
     "gold": 655
   },
   {
@@ -164,7 +164,7 @@
     "def": 17,
     "spd": 48,
     "multiplier": 1,
-    "exp": 25550,
+    "exp": 125550,
     "gold": 1000
   },
   {
