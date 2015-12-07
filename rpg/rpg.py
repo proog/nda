@@ -25,7 +25,7 @@ S_DEAD = 4
 
 
 class RPG:
-    respawn_delay = 60
+    respawn_delay = 5
     save_filename = relative_path('save.json')
 
     def __init__(self):
