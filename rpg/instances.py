@@ -46,7 +46,7 @@ class Dungeon(LoadedNamedEntity):
             '%s looks around. "What a strange place..."' % self.player.name,
             'A cold wind howls...',
             'A terrifying sound alerts %s! Behind you!' % self.player.name,
-            'An adorable silhouette looms in the distance. Oops! It's %s!' % enemy.name
+            'An adorable silhouette looms in the distance. Oops! It\'s %s!' % enemy.name
         ]
         post_intro_messages = [
             '%s has a lust for blood!' % enemy.name,
