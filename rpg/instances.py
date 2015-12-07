@@ -43,10 +43,18 @@ class Dungeon(LoadedNamedEntity):
             'Everything seems peaceful, when suddenly...',
             'A rabid %s appears before %s!' % (enemy.name, self.player.name),
             '"Now this is what I call adventure!" %s says to no one in particular.' % self.player.name,
-            '%s looks around. "What a strange place..."' % self.player.name
+            '%s looks around. "What a strange place..."' % self.player.name,
+            'A cold wind howls...',
+            'A terrifying sound alerts %s! Behind you!' % self.player.name,
+            'An adorable silhouette looms in the distance. Oops! It's %s!' % enemy.name
         ]
         post_intro_messages = [
-            '%s has a lust for blood!' % enemy.name
+            '%s has a lust for blood!' % enemy.name,
+            '%s trembles before the terrifying %s.' % (self.player.name, enemy.name),
+            'The mighty %s casts a haunting shadow.' % enemy.name,
+            '%s stumbles around in a drunken stupor.' % enemy.name,
+            '%s is filled with resolve.' % self.player.name,
+            '%s looks nervous.'
         ]
 
         if pre_intro:
