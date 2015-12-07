@@ -36,20 +36,28 @@ class Dungeon(LoadedNamedEntity):
     def new_encounter(self, log):
         enemy = self.boss() if self.encounter_count == self.max_encounters - 1 else weighted_choice(self.enemies())
         encounter = Encounter(self.player, enemy, log)
-
-        log.add(random.choice([
+        ambush = random.randint(0, 1) == 0
+        pre_intro = random.randint(0, 1) == 0
+        pre_intro_messages = [
             '%s notices some strange shadows.' % self.player.name,
             'Everything seems peaceful, when suddenly...',
-            '%s has a lust for blood!' % enemy.name,
             'A rabid %s appears before %s!' % (enemy.name, self.player.name),
             '"Now this is what I call adventure!" %s says to no one in particular.' % self.player.name,
             '%s looks around. "What a strange place..."' % self.player.name
-        ]))
+        ]
+        post_intro_messages = [
+            '%s has a lust for blood!' % enemy.name
+        ]
 
-        if random.randint(0, 1) == 0:
-            log.add('%s encountered %s!' % (self.player.name, enemy))
-        else:
-            log.add('%s ambushed %s!' % (enemy, self.player.name))
+        if pre_intro:
+            log.add(random.choice(pre_intro_messages))
+
+        log.add('%s ambushed %s!' % (enemy, self.player.name) if ambush else '%s encountered %s!' % (self.player.name, enemy))
+
+        if not pre_intro:
+            log.add(random.choice(post_intro_messages))
+
+        if ambush:
             encounter.enemy_attack(log)
 
         self.encounter_count += 1
