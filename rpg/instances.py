@@ -40,6 +40,8 @@ class Dungeon(LoadedNamedEntity):
         log.add(random.choice([
             '%s notices some strange shadows.' % self.player.name,
             'Everything seems peaceful, when suddenly...',
+            '%s has a lust for blood!' % enemy.name,
+            'A rabid %s appears before %s!' % (enemy.name, self.player.name),
             '"Now this is what I call adventure!" %s says to no one in particular.' % self.player.name,
             '%s looks around. "What a strange place..."' % self.player.name
         ]))
