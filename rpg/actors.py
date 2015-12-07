@@ -54,10 +54,10 @@ class Player(Actor):
         self.lvl += 1
         self.max_hp += random.randint(8, 16)
         self.hp = self.max_hp
-        self.atk += 1
-        self.def_ += 1
-        self.spd += 1
-        self.lck += 1
+        self.atk += random.randint(1, 4)
+        self.def_ += random.randint(1, 4)
+        self.spd += random.randint(1, 4)
+        self.lck += random.randint(1, 4)
         log.add('%s attained level %i! Abilities are enhanced!' % (self.name, self.lvl))
         log.add(str(self))
 
