@@ -18,20 +18,41 @@
     "name": "Halberd",
     "description": "powerful stuff...",
     "multiplier": 1.4,
-    "cost": 480
+    "cost": 300
   },
   {
     "id": "wep_4",
     "name": "Greatsword",
     "description": "powerful stuff...",
     "multiplier": 1.7,
-    "cost": 1300
+    "cost": 500
   },
   {
     "id": "wep_5",
-    "name": "Swordbreaker",
+    "name": "Swordeater",
     "description": "powerful stuff...",
     "multiplier": 2,
-    "cost": 3000
+    "cost": 1000
+  },
+  {
+    "id": "wep_6",
+    "name": "Hammer",
+    "description": "powerful stuff...",
+    "multiplier": 2.1,
+    "cost": 1280
+  },
+  {
+    "id": "wep_7",
+    "name": "Icebreaker",
+    "description": "powerful stuff...",
+    "multiplier": 2.3,
+    "cost": 2500
+  },
+  {
+    "id": "wep_8",
+    "name": "Wonderwand",
+    "description": "powerful stuff...",
+    "multiplier": 2.5,
+    "cost": 4000
   }
 ]
