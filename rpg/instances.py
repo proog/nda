@@ -54,7 +54,7 @@ class Dungeon(LoadedNamedEntity):
             'The mighty %s casts a haunting shadow.' % enemy.name,
             '%s stumbles around in a drunken stupor.' % enemy.name,
             '%s is filled with resolve.' % self.player.name,
-            '%s looks nervous.'
+            '%s looks nervous.' % enemy.name
         ]
 
         if pre_intro:
