@@ -184,8 +184,8 @@ class RPG:
         return out
 
     def inventory(self):
-        return ['%i gold | Weapon: %s | Spells:' % (self.player.gold, self.player.weapon.name)] + \
-               ['%i: %s' % (i+1, spell.name) for i, spell in enumerate(self.player.spells)]
+        spell_names = ['%i: %s' % (i+1, spell.name) for i, spell in enumerate(self.player.spells)]
+        return ['%i gold | Weapon: %s | %s' % (self.player.gold, self.player.weapon.name, 'Spells:' if len(spell_names) > 0 else 'No spells')]
 
     def new_game(self, player_name):
         self.encounter = None
@@ -320,8 +320,12 @@ class RPG:
             self.player.exp = sav['exp']
             self.player.gold = sav['gold']
             self.player.lvl = sav['lvl']
-            self.player.spells = [spell for spell in self.spells if spell.id in sav['spell_ids']]
             self.player.change_weapon(weapon, Log())
+
+            for spell in self.spells:
+                if spell.id in sav['spell_ids']:
+                    self.player.add_spell(spell)
+
             return ['Loaded game.']
 
 
