@@ -143,7 +143,9 @@ class RPG:
             self.player.change_weapon(item, log)
         else:
             self.player.add_spell(item, log)
+
         self.player.remove_gold(item.cost, log)
+        self.save()
 
         if self.state == S_DEAD:
             return log.output() + ['Strangely, it materializes next to the sleeping %s. Perhaps dreams do come true after all!' % self.player.name]
@@ -155,6 +157,7 @@ class RPG:
     def respawn(self):
         if self.can_respawn():
             self.player.respawn()
+            self.last_used_shop = None
             self.time_of_death = None
             self.state = S_OVERWORLD
             return [random.choice([
@@ -185,11 +188,14 @@ class RPG:
 
     def inventory(self):
         spell_names = ['%i: %s' % (i+1, spell.name) for i, spell in enumerate(self.player.spells)]
-        return ['%i gold | Weapon: %s | %s' % (self.player.gold, self.player.weapon.name, 'Spells:' if len(spell_names) > 0 else 'No spells')]
+        spell_text = 'Spells:' if len(spell_names) > 0 else 'No spells'
+        return ['%i gold | Weapon: %s | %s' % (self.player.gold, self.player.weapon.name, spell_text)] + spell_names
 
     def new_game(self, player_name):
         self.encounter = None
         self.dungeon = None
+        self.last_used_shop = None
+        self.time_of_death = None
         self.player = Player(player_name, self.weapons[0])
         self.state = S_OVERWORLD
         self.save()
@@ -223,6 +229,7 @@ class RPG:
         self.state = S_OVERWORLD
         self.encounter = None
         self.dungeon = None
+        self.last_used_shop = None
         return out
 
     def new_encounter(self):

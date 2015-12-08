@@ -126,7 +126,7 @@ class Player(Actor):
         log.add('%i gold removed.' % gold)
 
     def __str__(self):
-        return '%s (LVL %i | HP %i/%i | MP %i/%i | ATK %i | MATK %i | DEF %i | MDEF %i | SPD %i' % (self.name, self.lvl, self.hp, self.max_hp, self.mp, self.max_mp, self.atk, self.matk, self.def_, self.mdef, self.spd)
+        return '%s (LVL %i | HP %i/%i | MP %i/%i | ATK %i | MATK %i | DEF %i | MDEF %i | SPD %i)' % (self.name, self.lvl, self.hp, self.max_hp, self.mp, self.max_mp, self.atk, self.matk, self.def_, self.mdef, self.spd)
 
 
 class Enemy(Actor):
