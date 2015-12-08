@@ -5,7 +5,8 @@
     "description": "weak healing spell",
     "multiplier": -1,
     "cost": 150,
-    "piercing": true
+    "piercing": true,
+    "mp": 10
   },
   {
     "id": "spell_2",
@@ -13,6 +14,7 @@
     "description": "weak offensive spell",
     "multiplier": 1,
     "cost": 300,
-    "piercing": false
+    "piercing": false,
+    "mp": 10
   }
 ]

@@ -122,8 +122,8 @@ class Encounter:
         self.player.attack(self.enemy, self.player.weapon.multiplier, self.player.weapon.piercing, log)
         self.end_player_turn(log)
 
-    def player_spell(self, spell, target, log):
-        self.player.spell(self.player if target.lower() == 'self' else self.enemy, spell.multiplier, spell.piercing, log)
+    def player_spell(self, spell, target_str, log):
+        self.player.spell(self.player if target_str.lower() == 'self' else self.enemy, spell, log)
         self.end_player_turn(log)
 
     def player_flee(self, log):

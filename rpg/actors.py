@@ -26,15 +26,20 @@ class Actor(NamedEntity):
         log.add('%s attacked %s for %i DMG (%i/%i HP)!' % (self.name, actor.name, dmg, actor.hp, actor.max_hp))
         #log.add('random %i, attacker multiplier %f, unrounded damage %f' % (rand, multiplier, dmg2))
 
-    def spell(self, actor, multiplier, piercing, log):
-        diff = self.matk if piercing else max(self.matk - actor.mdef_, 0)
+    def spell(self, actor, spell, log):
+        if self.mp < spell.mp:
+            log.add('%s doesn\'t have enough MP to use %s!' % (self.name, spell.name))
+            return
+
+        diff = self.matk if spell.piercing else max(self.matk - actor.mdef_, 0)
         rand = random.randint(1,3)
-        dmg = ((diff ** 2) / 8 - 0.8 * diff + rand) * multiplier
+        dmg = ((diff ** 2) / 8 - 0.8 * diff + rand) * spell.multiplier
         dmg2 = dmg
         dmg = int(round(dmg, 0))
         actor.hp = max(actor.hp - dmg, 0)
+        self.mp -= spell.mp
 
-        if multiplier < 0:
+        if spell.multiplier < 0:
             log.add('%s healed %s by %i HP (%i/%i HP)!' % (self.name, actor.name, abs(dmg), actor.hp, actor.max_hp))
         else:
             log.add('%s attacked %s for %i DMG (%i/%i HP)!' % (self.name, actor.name, dmg, actor.hp, actor.max_hp))
@@ -57,7 +62,7 @@ class Actor(NamedEntity):
 class Player(Actor):
     def __init__(self, name, starting_weapon):
         hp = random.randint(14, 26)
-        mp = random.randint(5, 8)
+        mp = random.randint(14, 26)
         atk = random.randint(1, 6)
         def_ = random.randint(1, 6)
         matk = random.randint(1, 6)
@@ -75,11 +80,14 @@ class Player(Actor):
     def level_up(self, log):
         self.lvl += 1
         self.max_hp += random.randint(8, 16)
-        self.hp = self.max_hp
+        self.max_mp += random.randint(8, 16)
         self.atk += random.randint(1, 4)
         self.def_ += random.randint(1, 4)
+        self.matk += random.randint(1, 4)
+        self.mdef += random.randint(1, 4)
         self.spd += random.randint(1, 4)
         self.lck += random.randint(1, 4)
+        self.respawn()
         log.add('%s attained level %i! Abilities are enhanced!' % (self.name, self.lvl))
         log.add(str(self))
 

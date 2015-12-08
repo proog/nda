@@ -31,6 +31,7 @@ class Weapon(ActiveItem):
 class Spell(ActiveItem):
     def __init__(self, definition):
         super(Spell, self).__init__(definition)
+        self.mp = definition['mp']
 
 
 class Armor(Item):
