@@ -91,7 +91,7 @@ class Encounter:
         return self.fled
 
     def enemy_attack(self, log):
-        self.enemy.attack(self.player, log)
+        self.enemy.attack(self.player, self.enemy.multiplier, False, log)
         if self.player.dead():
             log.add('%s was defeated...' % self.player.name)
             log.add(random.choice([
@@ -104,8 +104,13 @@ class Encounter:
                 '... but a traveling band of friendly bards discover %s on the ground...' % self.player.name
             ]))
 
-    def player_attack(self, log):
-        self.player.attack(self.enemy, log)
+    def end_player_turn(self, log, flee_attempt=False):
+        if flee_attempt:
+            if self.fled:
+                log.add('%s flees!' % self.player.name)
+                return
+            else:
+                log.add('%s couldn\'t flee!' % self.player.name)
 
         if self.enemy.alive():
             self.enemy_attack(log)
@@ -113,11 +118,14 @@ class Encounter:
             log.add('%s vanquished!' % self.enemy.name)
             self.player.add_rewards(self.enemy.exp, self.enemy.gold, log)
 
+    def player_attack(self, log):
+        self.player.attack(self.enemy, self.player.weapon.multiplier, self.player.weapon.piercing, log)
+        self.end_player_turn(log)
+
+    def player_spell(self, spell, target, log):
+        self.player.spell(self.player if target.lower() == 'self' else self.enemy, spell.multiplier, spell.piercing, log)
+        self.end_player_turn(log)
+
     def player_flee(self, log):
         self.fled = random.randint(0, self.enemy.spd + self.player.spd) > self.enemy.spd
-
-        if self.fled:
-            log.add('%s flees!' % self.player.name)
-        else:
-            log.add('%s couldn\'t flee!' % self.player.name)
-            self.enemy_attack(log)
+        self.end_player_turn(log, flee_attempt=True)

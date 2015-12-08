@@ -1,0 +1,18 @@
+[
+  {
+    "id": "spell_1",
+    "name": "Cure",
+    "description": "weak healing spell",
+    "multiplier": -1,
+    "cost": 150,
+    "piercing": true
+  },
+  {
+    "id": "spell_2",
+    "name": "Fire",
+    "description": "weak offensive spell",
+    "multiplier": 1,
+    "cost": 300,
+    "piercing": false
+  }
+]

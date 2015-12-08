@@ -4,55 +4,63 @@
     "name": "Axe",
     "description": "powerful stuff...",
     "multiplier": 1,
-    "cost": 50
+    "cost": 50,
+    "piercing": false
   },
   {
     "id": "wep_2",
     "name": "Sword",
     "description": "powerful stuff...",
     "multiplier": 1.2,
-    "cost": 140
+    "cost": 140,
+    "piercing": false
   },
   {
     "id": "wep_3",
     "name": "Halberd",
     "description": "powerful stuff...",
     "multiplier": 1.4,
-    "cost": 300
+    "cost": 300,
+    "piercing": false
   },
   {
     "id": "wep_4",
     "name": "Greatsword",
     "description": "powerful stuff...",
     "multiplier": 1.7,
-    "cost": 500
+    "cost": 500,
+    "piercing": false
   },
   {
     "id": "wep_5",
     "name": "Swordeater",
     "description": "powerful stuff...",
     "multiplier": 2,
-    "cost": 1000
+    "cost": 1000,
+    "piercing": false
   },
   {
     "id": "wep_6",
     "name": "Hammer",
     "description": "powerful stuff...",
     "multiplier": 2.1,
-    "cost": 1280
+    "cost": 1280,
+    "piercing": false
   },
   {
     "id": "wep_7",
     "name": "Icebreaker",
     "description": "powerful stuff...",
     "multiplier": 2.3,
-    "cost": 2500
+    "cost": 2500,
+    "piercing": false
   },
   {
     "id": "wep_8",
     "name": "Wonderwand",
     "description": "powerful stuff...",
     "multiplier": 2.5,
-    "cost": 4000
+    "cost": 4000,
+    "piercing": false
   }
 ]

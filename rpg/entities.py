@@ -11,14 +11,26 @@ class LoadedNamedEntity(NamedEntity):
 
 
 class Item(LoadedNamedEntity):
-    pass
+    def __init__(self, definition):
+        super(Item, self).__init__(definition)
+        self.cost = definition['cost']
 
 
-class Weapon(Item):
+class ActiveItem(Item):
+    def __init__(self, definition):
+        super(ActiveItem, self).__init__(definition)
+        self.piercing = definition['piercing']
+        self.multiplier = definition['multiplier']
+
+
+class Weapon(ActiveItem):
     def __init__(self, definition):
         super(Weapon, self).__init__(definition)
-        self.multiplier = definition['multiplier']
-        self.cost = definition['cost']
+
+
+class Spell(ActiveItem):
+    def __init__(self, definition):
+        super(Spell, self).__init__(definition)
 
 
 class Armor(Item):
