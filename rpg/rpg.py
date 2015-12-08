@@ -134,6 +134,9 @@ class RPG:
         log = Log()
         item = self.weapons[index] if is_weapon_shop else self.spells[index]
 
+        if is_weapon_shop and item == self.player.weapon or not is_weapon_shop and item in self.player.spells:
+            return ['%s already has that.' % self.player.name]
+
         if self.player.gold < item.cost:
             if self.state == S_DEAD:
                 return ['%s doesn\'t have enough dream gold to buy that.' % self.player.name]
