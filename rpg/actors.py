@@ -31,7 +31,7 @@ class Actor(NamedEntity):
             log.add('%s doesn\'t have enough MP to use %s!' % (self.name, spell.name))
             return
 
-        diff = self.matk if spell.piercing else max(self.matk - actor.mdef_, 0)
+        diff = self.matk if spell.piercing else max(self.matk - actor.mdef, 0)
         rand = random.randint(1,3)
         dmg = ((diff ** 2) / 8 - 0.8 * diff + rand) * spell.multiplier
         dmg2 = dmg
