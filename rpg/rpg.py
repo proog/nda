@@ -334,7 +334,7 @@ class RPG:
 
             for spell in self.spells:
                 if spell.id in sav['spell_ids']:
-                    self.player.add_spell(spell)
+                    self.player.add_spell(spell, Log())
 
             return ['Loaded game.']
 
