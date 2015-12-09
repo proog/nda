@@ -71,7 +71,7 @@ def generic_lookup(message):
 
         def handle_data(self, data):
             if self.in_title:
-                self.title = data.replace('\r', '').replace('\n', '').strip()
+                self.title = ' '.join(data.strip().split())
 
         def error(self, message):
             pass
