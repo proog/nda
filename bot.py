@@ -34,7 +34,7 @@ class Bot:
     buffer_size = 4096
     receive_timeout = 5
     message_timeout = 180
-    passive_interval = 10  # how long between performing passive, input independent operations like mail
+    passive_interval = 30  # how long between performing passive, input independent operations like mail
     crlf = '\r\n'
 
     def __init__(self, conf_file):
@@ -319,7 +319,7 @@ class Bot:
             self._send_message(reply_target, 'message sent to %s :)' % args[0])
 
         def unsend_mail():
-            if len(args) < 2:
+            if len(args) < 1:
                 return
             try:
                 id = int(args[0])
@@ -327,6 +327,13 @@ class Bot:
                 self._send_message(source_nick, 'message %i unsent :)' % id if success else 'message %i wasn\'t found :(')
             except ValueError:
                 pass
+
+        def outbox():
+            messages = self.mail.outbox(source_nick)
+            if len(messages) == 0:
+                self._send_message(source_nick, 'no unsent messages')
+            else:
+                multiline(messages)
 
         command = command.lower()
         commands = {
@@ -342,7 +349,7 @@ class Bot:
             '!rpg': rpg_action,
             '!send': send_mail,
             '!unsend': unsend_mail,
-            '!outbox': lambda: multiline(self.mail.outbox(source_nick)),
+            '!outbox': outbox,
             # '!shell': shell_command,
             # '!up': lambda: multiline(self.game.up()),
             # '!down': lambda: multiline(self.game.down()),
