@@ -316,7 +316,7 @@ class Bot:
             if len(args) < 2:
                 return
             self.mail.send(source_nick, args[0], ' '.join(args[1:]))
-            self._send_message(reply_target, 'message sent to %s :)' % args[0])
+            self._send_message(source_nick, 'message sent to %s :)' % args[0])
 
         def unsend_mail():
             if len(args) < 1:
