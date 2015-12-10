@@ -15,6 +15,7 @@ from idle_talk import IdleTalk
 from quotes import Quotes
 from maze import Maze
 from rpg.main import RPG
+from mail import Mail
 
 
 class IRCError(Exception):
@@ -31,8 +32,9 @@ class Channel:
 
 class Bot:
     buffer_size = 4096
-    receive_timeout = 10
-    message_timeout = 600
+    receive_timeout = 5
+    message_timeout = 180
+    passive_interval = 10  # how long between performing passive, input independent operations like mail
     crlf = '\r\n'
 
     def __init__(self, conf_file):
@@ -54,6 +56,9 @@ class Bot:
         self.nick_index = 0
         self.connect_time = None
         self.last_message = None
+        self.last_passive = None
+        self.quotes = None
+        self.mail = None
 
     def _send(self, msg):
         if not msg.endswith(self.crlf):
@@ -86,6 +91,18 @@ class Bot:
     def _join(self, channel):
         self._log('Sending JOIN %s' % channel)
         self._send('JOIN %s' % channel)
+
+    def _ison(self, nicks):
+        nicks_str = ' '.join(nicks)
+        self._log('Sending ISON %s' % nicks_str)
+        self._send('ISON %s' % nicks_str)
+
+    def _process_mail(self, to):
+        messages = self.mail.unread(to)
+        if len(messages) > 0:
+            self._send_message(to, 'you have %i unread message(s)' % len(messages))
+            for message in messages:
+                self._send_message(to, message)
 
     def _log(self, msg):
         msg = '%s %s' % (datetime.datetime.utcnow(), msg)
@@ -122,12 +139,14 @@ class Bot:
         self.irc.connect((self.address, self.port))
         self.connect_time = datetime.datetime.utcnow()
         self.last_message = datetime.datetime.utcnow()
+        self.last_passive = datetime.datetime.utcnow()
         self._send('USER %s 8 * :%s' % (self.user, self.real_name))
         self._change_nick(self.nicks[self.nick_index])
 
     def _disconnect(self):
         self._log('Disconnecting from %s:%s' % (self.address, self.port))
         self.quotes.close()
+        self.mail.close()
 
         try:
             self._send('QUIT :%s' % self.quit_message)
@@ -138,16 +157,25 @@ class Bot:
     def _receive(self):
         line = self._readline()  # a line or None if nothing received
 
-        if line is None:
-            # if we don't receive any messages or pings for a while, something strange happened (like a netsplit)
-            if (datetime.datetime.utcnow() - self.last_message).total_seconds() > self.message_timeout:
-                raise IRCError('No message received from the server in %i seconds' % self.message_timeout)
+        # if we don't receive any messages or pings for a while, something strange happened (like a netsplit)
+        if (datetime.datetime.utcnow() - self.last_message).total_seconds() > self.message_timeout:
+            raise IRCError('No message received from the server in %i seconds' % self.message_timeout)
+
+        # perform passive operations if the interval is up
+        if (datetime.datetime.utcnow() - self.last_passive).total_seconds() > self.passive_interval:
+            # check if any nicks with unread messages have come online
+            unread_receivers = self.mail.unread_receivers()
+            if len(unread_receivers) > 0:
+                self._ison(unread_receivers)
 
             # check if it's time to talk
             for channel in self.channels:
                 if channel.idle_talk.can_talk() and False:
                     self._send_message(channel.name, channel.idle_talk.generate_message())
 
+            self.last_passive = datetime.datetime.utcnow()
+
+        if line is None:
             return
 
         data = line.split()
@@ -172,6 +200,9 @@ class Bot:
 
                 for channel in self.channels:
                     self._join(channel.name)
+            elif command == '303':  # RPL_ISON: list of online nicks, process mail here
+                for nick in ' '.join(data[3:]).lstrip(':').split():
+                    self._process_mail(nick)
             elif command == '433':  # ERR_NICKNAMEINUSE: nick already taken
                 self.nick_index += 1
                 if self.nick_index >= len(self.nicks):
@@ -181,6 +212,9 @@ class Bot:
             elif command == 'KICK':
                 time.sleep(2)
                 self._join(data[2])
+            elif command == 'JOIN':  # process mail as soon as the user joins instead of after passive_interval seconds
+                if source_nick not in self.nicks:  # disregard own joins
+                    self._process_mail(source_nick)
             elif command == 'PRIVMSG':
                 target = data[2]
                 reply_target = target if target in [c.name for c in self.channels] else source_nick  # channel or direct message
@@ -278,6 +312,12 @@ class Bot:
                 if reply_target == channel.name:  # only allow rpg play in channel
                     multiline(channel.rpg.action(' '.join(args)))
 
+        def send_mail():
+            if len(args) < 2:
+                return
+            self.mail.send(source_nick, args[0], ' '.join(args[1:]))
+            self._send_message(reply_target, 'message sent :)')
+
         command = command.lower()
         commands = {
             '!hi': lambda: self._send_message(reply_target, 'hi %s' % source_nick),
@@ -289,7 +329,8 @@ class Bot:
             '!quotecount': quote_count,
             '!update': update,
             '!isitmovienight': lambda: self._send_message(reply_target, 'maybe :)' if datetime.datetime.utcnow().weekday() in [4, 5] else 'no :('),
-            '!rpg': rpg_action
+            '!rpg': rpg_action,
+            '!send': send_mail,
             # '!shell': shell_command,
             # '!up': lambda: multiline(self.game.up()),
             # '!down': lambda: multiline(self.game.down()),
@@ -341,6 +382,7 @@ class Bot:
         self.unfinished_line = ''
         self.nick_index = 0
         self.quotes = Quotes([c.name for c in self.channels])
+        self.mail = Mail()
 
         self._connect()
         while True:
