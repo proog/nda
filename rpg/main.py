@@ -29,9 +29,8 @@ S_DEAD = 4
 
 class RPG:
     respawn_delay = 5
-    save_filename = relative_path('save.json')
 
-    def __init__(self):
+    def __init__(self, save_name):
         with open(relative_path('dungeons.json')) as dungeons, \
                 open(relative_path('enemies.json')) as enemies, \
                 open(relative_path('weapons.json')) as weapons, \
@@ -78,6 +77,8 @@ class RPG:
                 A_STATUS: (self.status, 0, '')
             }
         }
+
+        self.save_filename = relative_path('save-%s.json' % save_name.strip())
 
         if os.path.exists(self.save_filename):
             self.load()
@@ -340,7 +341,7 @@ class RPG:
 
 
 if __name__ == '__main__':
-    g = RPG()
+    g = RPG('#stufferinos')
 
     while True:
         c = input()

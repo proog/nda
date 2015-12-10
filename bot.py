@@ -14,15 +14,23 @@ import traceback
 from idle_talk import IdleTalk
 from quotes import Quotes
 from maze import Maze
-from rpg import rpg
+from rpg.main import RPG
 
 
 class IRCError(Exception):
     pass
 
 
+class Channel:
+    def __init__(self, name):
+        self.name = name
+        self.idle_talk = IdleTalk()
+        self.game = Maze()
+        self.rpg = RPG(name)
+
+
 class Bot:
-    buffer_size = 1024
+    buffer_size = 4096
     receive_timeout = 10
     message_timeout = 600
     crlf = '\r\n'
@@ -35,7 +43,7 @@ class Bot:
             self.user = conf['user']
             self.nicks = conf['nicks']
             self.real_name = conf['real_name']
-            self.channel = conf['channel']
+            self.channels = [Channel(c) for c in conf['channels']]
             self.nickserv_password = conf['nickserv_password'] if 'nickserv_password' in conf.keys() else None
             self.trusted_nicks = conf['trusted_nicks'] if 'trusted_nicks' in conf.keys() else []
             self.quit_message = conf['quit_message'] if 'quit_message' in conf.keys() else ''
@@ -44,9 +52,6 @@ class Bot:
         self.lines = []
         self.unfinished_line = ''
         self.nick_index = 0
-        self.idle_talk = None
-        self.quotes = None
-        self.game = None
         self.connect_time = None
         self.last_message = None
 
@@ -139,8 +144,9 @@ class Bot:
                 raise IRCError('No message received from the server in %i seconds' % self.message_timeout)
 
             # check if it's time to talk
-            if self.idle_talk.can_talk() and False:
-                self._send_message(self.channel, self.idle_talk.generate_message())
+            for channel in self.channels:
+                if channel.idle_talk.can_talk() and False:
+                    self._send_message(channel.name, channel.idle_talk.generate_message())
 
             return
 
@@ -163,7 +169,9 @@ class Bot:
             if command == '001':  # RPL_WELCOME: successful client registration
                 if self.nickserv_password is not None and len(self.nickserv_password) > 0:
                     self._send_message('NickServ', 'IDENTIFY %s' % self.nickserv_password)
-                self._join(self.channel)
+
+                for channel in self.channels:
+                    self._join(channel.name)
             elif command == '433':  # ERR_NICKNAMEINUSE: nick already taken
                 self.nick_index += 1
                 if self.nick_index >= len(self.nicks):
@@ -172,10 +180,10 @@ class Bot:
                 self._change_nick(self.nicks[self.nick_index])
             elif command == 'KICK':
                 time.sleep(2)
-                self._join(self.channel)
+                self._join(data[2])
             elif command == 'PRIVMSG':
                 target = data[2]
-                reply_target = target if target.startswith('#') else source_nick  # channel or direct message
+                reply_target = target if target in [c.name for c in self.channels] else source_nick  # channel or direct message
                 message = ' '.join(data[3:]).strip().lstrip(':')
                 self._parse_message(message, reply_target, source_nick)
 
@@ -189,9 +197,11 @@ class Bot:
             # implicit commands
             self._implicit_command(message, reply_target, source_nick)
 
-            if reply_target == self.channel:
-                self.idle_talk.add_message(message)  # add message to the idle talk log
-                self.quotes.add_quote(int(datetime.datetime.utcnow().timestamp()), source_nick, message)  # add message to the quotes database
+            for channel in self.channels:
+                if reply_target == channel.name:
+                    channel.idle_talk.add_message(message)  # add message to the idle talk log
+                    timestamp = int(datetime.datetime.utcnow().timestamp())
+                    self.quotes.add_quote(channel.name, timestamp, source_nick, message)  # add message to the quotes database
 
     def _explicit_command(self, command, args, reply_target, source_nick):
         def parse_quote_command():
@@ -224,13 +234,19 @@ class Bot:
                 self._send_message(reply_target, comment)
 
         def quote():
+            if reply_target not in [c.name for c in self.channels]:  # only allow quote requests in a channel
+                return
+
             author, year = parse_quote_command()
-            random_quote = self.quotes.random_quote(author, year)
+            random_quote = self.quotes.random_quote(reply_target, author, year)
             self._send_message(reply_target, random_quote if random_quote is not None else 'no quotes found :(')
 
         def quote_count():
+            if reply_target not in [c.name for c in self.channels]:
+                return
+
             author, year = parse_quote_command()
-            count = self.quotes.quote_count(author, year)
+            count = self.quotes.quote_count(reply_target, author, year)
             self._send_message(reply_target, '%i quotes' % count)
 
         def update():
@@ -240,7 +256,7 @@ class Bot:
                     time.sleep(5)  # give the server time to process disconnection to prevent nick collision
                     shell.restart(__file__)
                 else:
-                    self._send_message(reply_target, 'pull failed wih non-zero return code :(')
+                    self._send_message(reply_target, 'pull failed, manual update required :(')
 
         def shell_command():
             if source_nick in self.trusted_nicks:
@@ -252,8 +268,9 @@ class Bot:
                 self._send_message(reply_target, line)
 
         def rpg_action():
-            if reply_target == self.channel:  # only allow rpg play in channel
-                multiline(self.rpg.action(' '.join(args)))
+            for channel in self.channels:
+                if reply_target == channel.name:  # only allow rpg play in channel
+                    multiline(channel.rpg.action(' '.join(args)))
 
         command = command.lower()
         commands = {
@@ -317,10 +334,7 @@ class Bot:
         self.lines = []
         self.unfinished_line = ''
         self.nick_index = 0
-        self.idle_talk = IdleTalk()
-        self.quotes = Quotes(self.channel)
-        self.game = Maze()
-        self.rpg = rpg.RPG()
+        self.quotes = Quotes([c.name for c in self.channels])
 
         self._connect()
         while True:
