@@ -337,6 +337,7 @@ class Bot:
 
         command = command.lower()
         commands = {
+            '!help': lambda: self._send_message(reply_target, 'https://github.com/proog/nda#commands'),
             '!hi': lambda: self._send_message(reply_target, 'hi %s' % source_nick),
             '!imgur': lambda: self._send_message(reply_target, link_generator.imgur_link()),
             '!reddit': lambda: self._send_message(reply_target, link_generator.reddit_link()),
