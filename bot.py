@@ -303,14 +303,14 @@ class Bot:
                 for line in shell.run(' '.join(args)):
                     self._send_message(reply_target, line)
 
-        def multiline(lines):
+        def multiline(to, lines):
             for line in lines:
-                self._send_message(reply_target, line)
+                self._send_message(to, line)
 
         def rpg_action():
             for channel in self.channels:
                 if reply_target == channel.name:  # only allow rpg play in channel
-                    multiline(channel.rpg.action(' '.join(args)))
+                    multiline(reply_target, channel.rpg.action(' '.join(args)))
 
         def send_mail():
             if len(args) < 2:
@@ -333,7 +333,7 @@ class Bot:
             if len(messages) == 0:
                 self._send_message(source_nick, 'no unsent messages')
             else:
-                multiline(messages)
+                multiline(source_nick, messages)
 
         command = command.lower()
         commands = {
@@ -352,12 +352,12 @@ class Bot:
             '!unsend': unsend_mail,
             '!outbox': outbox,
             # '!shell': shell_command,
-            # '!up': lambda: multiline(self.game.up()),
-            # '!down': lambda: multiline(self.game.down()),
-            # '!left': lambda: multiline(self.game.left()),
-            # '!right': lambda: multiline(self.game.right()),
-            # '!look': lambda: multiline(self.game.look()),
-            # '!restart': lambda: multiline(self.game.restart())
+            # '!up': lambda: multiline(reply_target, self.game.up()),
+            # '!down': lambda: multiline(reply_target, self.game.down()),
+            # '!left': lambda: multiline(reply_target, self.game.left()),
+            # '!right': lambda: multiline(reply_target, self.game.right()),
+            # '!look': lambda: multiline(reply_target, self.game.look()),
+            # '!restart': lambda: multiline(reply_target, self.game.restart())
         }
 
         if command in commands:
