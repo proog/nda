@@ -98,7 +98,7 @@ class Bot:
         self._send('ISON %s' % nicks_str)
 
     def _process_mail(self, to):
-        messages = self.mail.unread(to)
+        messages = self.mail.unread_messages(to)
         if len(messages) > 0:
             self._send_message(to, 'you have %i unread message(s)' % len(messages))
             for message in messages:
@@ -316,7 +316,17 @@ class Bot:
             if len(args) < 2:
                 return
             self.mail.send(source_nick, args[0], ' '.join(args[1:]))
-            self._send_message(reply_target, 'message sent :)')
+            self._send_message(reply_target, 'message sent to %s :)' % args[0])
+
+        def unsend_mail():
+            if len(args) < 2:
+                return
+            try:
+                id = int(args[0])
+                success = self.mail.unsend(source_nick, id)
+                self._send_message(source_nick, 'message %i unsent :)' % id if success else 'message %i wasn\'t found :(')
+            except ValueError:
+                pass
 
         command = command.lower()
         commands = {
@@ -331,6 +341,8 @@ class Bot:
             '!isitmovienight': lambda: self._send_message(reply_target, 'maybe :)' if datetime.datetime.utcnow().weekday() in [4, 5] else 'no :('),
             '!rpg': rpg_action,
             '!send': send_mail,
+            '!unsend': unsend_mail,
+            '!outbox': lambda: multiline(self.mail.outbox(source_nick)),
             # '!shell': shell_command,
             # '!up': lambda: multiline(self.game.up()),
             # '!down': lambda: multiline(self.game.down()),

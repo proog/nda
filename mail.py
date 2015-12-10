@@ -21,15 +21,26 @@ class Mail:
                        % self.table_name, (from_, to, message, False, int(datetime.utcnow().timestamp()), None))
         self.db.commit()
 
-    def unread(self, to):
+    def unsend(self, from_, id):
         cursor = self.db.cursor()
-        cursor.execute('SELECT from_nick, message, sent_at FROM %s WHERE to_nick == ? AND received == ? ORDER BY sent_at ASC' % self.table_name, (to, False))
+        cursor.execute('DELETE FROM %s WHERE from_nick=? AND id=?' % self.table_name, (from_, id))
+        self.db.commit()
+        return cursor.rowcount > 0
+
+    def outbox(self, from_):
+        cursor = self.db.cursor()
+        cursor.execute('SELECT id, to_nick, message FROM %s WHERE from_nick=? AND received=? ORDER BY id' % self.table_name, (from_, False))
+        return ['%i: (%s) %s' % (id, to, msg) for id, to, msg in cursor.fetchall()]
+
+    def unread_messages(self, to):
+        cursor = self.db.cursor()
+        cursor.execute('SELECT from_nick, message, sent_at FROM %s WHERE to_nick=? AND received=? ORDER BY sent_at ASC' % self.table_name, (to, False))
 
         messages = ['%s -- %s, %s' % (msg, from_, datetime.utcfromtimestamp(sent).strftime('%Y-%m-%d %H:%M:%S'))
                     for from_, msg, sent in cursor.fetchall()]
 
         now = int(datetime.utcnow().timestamp())
-        cursor.execute('UPDATE %s SET received = ?, received_at = ? WHERE to_nick == ? AND received == ?' % self.table_name, (True, now, to, False))
+        cursor.execute('UPDATE %s SET received=?, received_at=? WHERE to_nick=? AND received=?' % self.table_name, (True, now, to, False))
         self.db.commit()
 
         return messages
