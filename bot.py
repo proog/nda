@@ -316,6 +316,7 @@ class Bot:
     def _main_loop(self):
         self.lines = []
         self.unfinished_line = ''
+        self.nick_index = 0
         self.idle_talk = IdleTalk()
         self.quotes = Quotes(self.channel)
         self.game = Maze()
