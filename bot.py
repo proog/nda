@@ -184,11 +184,17 @@ class Bot:
             elif command == 'PRIVMSG':
                 target = data[2]
                 reply_target = target if target in [c.name for c in self.channels] else source_nick  # channel or direct message
-                message = ' '.join(data[3:]).strip().lstrip(':')
+                message = ' '.join(data[3:]).lstrip(':')
                 self._parse_message(message, reply_target, source_nick)
 
     def _parse_message(self, message, reply_target, source_nick):
         tokens = message.split()
+
+        if len(tokens) == 0:
+            return  # don't process empty or whitespace-only messages
+
+        if message.startswith(' '):
+            tokens[0] = ' ' + tokens[0]  # any initial space is removed by str.split(), so we put it back here
 
         # explicit commands
         handled = self._explicit_command(tokens[0], tokens[1:] if len(tokens) > 1 else [], reply_target, source_nick)
