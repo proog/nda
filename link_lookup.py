@@ -6,6 +6,16 @@ import random
 from urllib.error import *
 
 
+user_agents = [
+    'Mozilla/5.0 (X11; U; Linux i686) Gecko/20071127 Firefox/2.0.0.11',
+    'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:41.0) Gecko/20100101 Firefox/41.0',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.101 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_4) AppleWebKit/534.57.2 (KHTML, like Gecko) Version/5.1.7 Safari/534.57.2',
+    'Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)',
+    'Opera/9.80 (Windows NT 5.1; U; en) Presto/2.10.229 Version/11.60'
+]
+
+
 def extract_youtube_id(message):
     match = re.search(r'(youtube.com/watch\?v=|youtu.be/)([a-zA-Z0-9_\-]{11})', message)
 
@@ -83,7 +93,8 @@ def generic_lookup(message):
 
     try:
         request = urllib.request.Request(link, headers={
-            'Accept-Language': 'en-US'  # to avoid geo-specific response language from e.g. twitter
+            'Accept-Language': 'en-US',  # to avoid geo-specific response language from e.g. twitter
+            'User-Agent': random.choice(user_agents)
         })
         response = urllib.request.urlopen(request)
 
@@ -124,18 +135,10 @@ def xhamster_comment(link):
             pass
 
     parser = Parser(convert_charrefs=True)
-    user_agents = [
-        'Mozilla/5.0 (X11; U; Linux i686) Gecko/20071127 Firefox/2.0.0.11',
-        'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:41.0) Gecko/20100101 Firefox/41.0',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.101 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_4) AppleWebKit/534.57.2 (KHTML, like Gecko) Version/5.1.7 Safari/534.57.2',
-        'Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)',
-        'Opera/9.80 (Windows NT 5.1; U; en) Presto/2.10.229 Version/11.60'
-    ]
 
     try:
         request = urllib.request.Request(link, headers={
-            'User-Agent': user_agents[random.randint(0, len(user_agents) - 1)]
+            'User-Agent': random.choice(user_agents)
         })
         response = urllib.request.urlopen(request)
         parser.feed(response.read().decode('utf-8'))
