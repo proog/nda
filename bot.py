@@ -32,7 +32,7 @@ class Channel:
 
 class Bot:
     buffer_size = 4096
-    receive_timeout = 5
+    receive_timeout = 0.5
     message_timeout = 180
     passive_interval = 30  # how long between performing passive, input independent operations like mail
     crlf = '\r\n'
@@ -275,6 +275,7 @@ class Bot:
 
         def quote():
             if reply_target not in [c.name for c in self.channels]:  # only allow quote requests in a channel
+                self._send_message(reply_target, 'command only available in channel :(')
                 return
 
             author, year = parse_quote_command()
@@ -283,6 +284,7 @@ class Bot:
 
         def quote_count():
             if reply_target not in [c.name for c in self.channels]:
+                self._send_message(reply_target, 'command only available in channel :(')
                 return
 
             author, year = parse_quote_command()
@@ -290,13 +292,16 @@ class Bot:
             self._send_message(reply_target, '%i quotes' % count)
 
         def update():
-            if source_nick in self.trusted_nicks:
-                if shell.git_pull():
-                    self._disconnect()
-                    time.sleep(5)  # give the server time to process disconnection to prevent nick collision
-                    shell.restart(__file__)
-                else:
-                    self._send_message(reply_target, 'pull failed, manual update required :(')
+            if source_nick not in self.trusted_nicks:
+                self._send_message(reply_target, 'how about no >:(')
+                return
+
+            if shell.git_pull():
+                self._disconnect()
+                time.sleep(5)  # give the server time to process disconnection to prevent nick collision
+                shell.restart(__file__)
+            else:
+                self._send_message(reply_target, 'pull failed, manual update required :(')
 
         def shell_command():
             if source_nick in self.trusted_nicks:
