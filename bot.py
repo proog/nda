@@ -247,19 +247,17 @@ class Bot:
         def parse_quote_command():
             author = None
             year = None
+            word = None
 
-            if len(args) > 0:
-                arg = args[0]
-                if re.match(r'^\d{4}$', arg) is not None:
+            for arg in args:
+                if re.match(r'^\?.+$', arg) is not None:
+                    word = arg[1:]
+                elif re.match(r'^\d{4}$', arg) is not None:
                     year = int(arg)
                 else:
                     author = arg
-            if len(args) > 1 and author is not None and year is None:
-                arg = args[1]
-                if re.match(r'^\d{4}$', arg) is not None:
-                    year = int(arg)
 
-            return author, year
+            return author, year, word
 
         def uptime():
             connect_time = self.connect_time.strftime('%Y-%m-%d %H:%M:%S')
@@ -278,8 +276,8 @@ class Bot:
                 self._send_message(reply_target, 'command only available in channel :(')
                 return
 
-            author, year = parse_quote_command()
-            random_quote = self.quotes.random_quote(reply_target, author, year)
+            author, year, word = parse_quote_command()
+            random_quote = self.quotes.random_quote(reply_target, author, year, word)
             self._send_message(reply_target, random_quote if random_quote is not None else 'no quotes found :(')
 
         def quote_count():
@@ -287,8 +285,8 @@ class Bot:
                 self._send_message(reply_target, 'command only available in channel :(')
                 return
 
-            author, year = parse_quote_command()
-            count = self.quotes.quote_count(reply_target, author, year)
+            author, year, word = parse_quote_command()
+            count = self.quotes.quote_count(reply_target, author, year, word)
             self._send_message(reply_target, '%i quotes' % count)
 
         def update():
@@ -406,7 +404,7 @@ class Bot:
         self.lines = []
         self.unfinished_line = ''
         self.nick_index = 0
-        self.quotes = Quotes([c.name for c in self.channels])
+        self.quotes = Quotes()
         self.mail = Mail()
 
         self._connect()

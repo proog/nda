@@ -9,27 +9,19 @@ from datetime import datetime, timezone
 class Quotes:
     db_name = 'quotes.db'
 
-    def __init__(self, channels, conf_file='quotes.conf'):
+    def __init__(self, conf_file='quotes.conf'):
         with open(conf_file, 'r', encoding='utf-8') as file:
             conf = json.load(file)
             self.ignore_nicks = conf['ignore']
             self.aliases = conf['aliases']
 
         self.db = sqlite3.connect(self.db_name)
-
-        for channel in channels:
-            self._create_table(channel)
-
-    def _table_name(self, channel):
-        return channel.replace('#', '', 1).strip()
-
-    def _create_table(self, channel):
-        table_name = self._table_name(channel)
-        cursor = self.db.cursor()
-        cursor.execute('CREATE TABLE IF NOT EXISTS %s (id INTEGER PRIMARY KEY AUTOINCREMENT, time INTEGER, author TEXT, message TEXT, word_count INTEGER)' % table_name)
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_time ON %s (time)' % table_name)
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_author ON %s (author)' % table_name)
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_word_count ON %s (word_count)' % table_name)
+        self.db.execute('CREATE TABLE IF NOT EXISTS quotes (id INTEGER PRIMARY KEY AUTOINCREMENT, channel TEXT, time INTEGER, author TEXT, message TEXT, word_count INTEGER)')
+        self.db.execute('CREATE INDEX IF NOT EXISTS idx_channel ON quotes (channel)')
+        self.db.execute('CREATE INDEX IF NOT EXISTS idx_time ON quotes (time)')
+        self.db.execute('CREATE INDEX IF NOT EXISTS idx_author ON quotes (author)')
+        self.db.execute('CREATE INDEX IF NOT EXISTS idx_message ON quotes (message)')
+        self.db.execute('CREATE INDEX IF NOT EXISTS idx_word_count ON quotes (word_count)')
         self.db.commit()
 
     def _normalize_nick(self, nick):
@@ -56,28 +48,33 @@ class Quotes:
         message = message.rstrip()  # remove trailing whitespace from message
         word_count = len(message.split())
 
-        if timestamp == 0 or len(author) == 0 or len(message) == 0 or author in self.ignore_nicks or word_count < 5:
+        if timestamp == 0 or len(author) == 0 or word_count < 5 or author in self.ignore_nicks:
             return False
 
         cursor = self.db.cursor()
-        cursor.execute('INSERT INTO %s (time, author, message, word_count) VALUES (?, ?, ?, ?)'
-                       % self._table_name(channel), (timestamp, author, message, word_count))
+        cursor.execute('INSERT INTO quotes (channel, time, author, message, word_count) VALUES (?, ?, ?, ?, ?)',
+                       (channel, timestamp, author, message, word_count))
 
         if commit:
             self.db.commit()
 
         return True  # return true if the quote was added
 
-    def random_quote(self, channel, author=None, year=None):
+    def random_quote(self, channel, author=None, year=None, word=None):
         time_tuple = self._year_to_timestamps(year)
-        num_rows = self.quote_count(channel, author, year)
+        num_rows = self.quote_count(channel, author, year, word)
 
         if time_tuple is None or num_rows == 0:
             return None
 
         random_skip = random.randint(0, num_rows - 1)
-        params = time_tuple
-        query = 'SELECT time, author, message FROM %s WHERE time>=? AND time<=?' % self._table_name(channel)
+        query = 'SELECT time, author, message FROM quotes WHERE channel=? AND time>=? AND time<=?'
+        params = (channel,) + time_tuple
+
+        if word is not None:
+            word = word.lower()
+            query += ' AND message LIKE ?'
+            params += ('%' + word + '%',)
 
         if author is not None:
             author = self._normalize_nick(author)
@@ -94,14 +91,19 @@ class Quotes:
 
         return '%s -- %s, %s' % (message, author, date)
 
-    def quote_count(self, channel, author=None, year=None):
+    def quote_count(self, channel, author=None, year=None, word=None):
         time_tuple = self._year_to_timestamps(year)
 
         if time_tuple is None:
             return 0
 
-        query = 'SELECT COUNT(*) FROM %s WHERE time>=? AND time<=?' % self._table_name(channel)
-        params = time_tuple
+        query = 'SELECT COUNT(*) FROM quotes WHERE channel=? AND time>=? AND time<=?'
+        params = (channel,) + time_tuple
+
+        if word is not None:
+            word = word.lower()
+            query += ' AND message LIKE ?'
+            params += ('%' + word + '%',)
 
         if author is not None:
             author = self._normalize_nick(author)
@@ -126,8 +128,8 @@ class Quotes:
             for line in log:
                 lines += 1
 
-                if lines % 5000 == 0:
-                    self.db.commit()  # commit every 5000 lines for performance
+                if lines % 20000 == 0:
+                    self.db.commit()  # commit every 20000 lines for performance
                     print('processing line %i' % lines)
 
                 line = line.strip()
@@ -154,7 +156,6 @@ class Quotes:
                 if self.add_quote(channel, timestamp, author, message, False):
                     imported += 1
                 else:
-                    print('Skipped message: <%s> %s' % (author, message))
                     skipped += 1
 
         self.db.commit()  # do a final commit if some insertions were left over
@@ -186,12 +187,13 @@ class Quotes:
 
 
 if __name__ == '__main__':
-    q = Quotes(['#garachat'])
+    q = Quotes()
     #for (nick, msg_count) in sorted(q.dump_irssi_log_authors('gclogs/#garachat-master.log').items(), key=lambda x: x[1], reverse=True):
     #    if nick not in q.aliases.keys():
     #        print('%s %i' % (nick, msg_count))
     #q.add_quote('#garachat', 0, 'ashin', '( ͡° ͜ʖ ͡°)')
     #q.import_irssi_log('gclogs/#garachat-master.log', '#garachat', 0)
-    print(q.random_quote(channel='#garachat', author='ashin', year=2010))
-    print(q.quote_count(channel='#garachat', author='sarah'))
+    #print(q.random_quote(channel='#garachat', author='ashin', year=2010))
+    #print(q.quote_count(channel='#garachat', author='sarah'))
+    print(q.random_quote(channel='#garachat', author='duo', word='fuck you guys'))
     q.close()
