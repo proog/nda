@@ -6,6 +6,7 @@ import random
 from urllib.error import *
 
 
+youtube_api_key = None
 user_agents = [
     'Mozilla/5.0 (X11; U; Linux i686) Gecko/20071127 Firefox/2.0.0.11',
     'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:41.0) Gecko/20100101 Firefox/41.0',
@@ -29,14 +30,16 @@ def contains_youtube(message):
 
 
 def youtube_lookup(message):
-    api_key = 'AIzaSyApSlFsotpdr3IRoh_dT0ElL3V9XN0lMyo'
+    if youtube_api_key is None or len(youtube_api_key) == 0:
+        return None
+
     youtube_id = extract_youtube_id(message)
 
     if youtube_id is None:
         return None
 
     try:
-        response = urllib.request.urlopen('https://www.googleapis.com/youtube/v3/videos?part=snippet&id=%s&key=%s' % (youtube_id, api_key))
+        response = urllib.request.urlopen('https://www.googleapis.com/youtube/v3/videos?part=snippet&id=%s&key=%s' % (youtube_id, youtube_api_key))
         data = response.read()
         json_data = json.loads(data.decode('utf-8'))
 
@@ -150,6 +153,9 @@ def xhamster_comment(link):
 
 
 if __name__ == '__main__':
+    with open('bot.conf') as f:
+        youtube_api_key = json.load(f).get('youtube_api_key', None)
+
     print(youtube_lookup('https://www.youtube.com/watch?v=g6QW-rFtKfA&feature=youtu.be&t=1529'))
     print(generic_lookup('hi here is a link for you https://twitter.com/qataraxia/status/672901207845961728'))
     #print(xhamster_comment('http://xhamster.com/movies/3949336/merry_christmas_and_happy_new_year.html'))
