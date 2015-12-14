@@ -61,25 +61,31 @@ class Quotes:
         return True  # return true if the quote was added
 
     def random_quote(self, channel, author=None, year=None, word=None):
-        time_tuple = self._year_to_timestamps(year)
         num_rows = self.quote_count(channel, author, year, word)
 
-        if time_tuple is None or num_rows == 0:
+        if num_rows == 0:
             return None
 
         random_skip = random.randint(0, num_rows - 1)
-        query = 'SELECT time, author, message FROM quotes WHERE channel=? AND time>=? AND time<=?'
-        params = (channel,) + time_tuple
+        query = 'SELECT time, author, message FROM quotes WHERE channel=?'
+        params = (channel,)
 
-        if word is not None:
-            word = word.lower()
-            query += ' AND message LIKE ?'
-            params += ('%' + word + '%',)
+        if year is not None:
+            time_tuple = self._year_to_timestamps(year)
+            if time_tuple is None:
+                return None
+            query += ' AND time>=? AND time<=?'
+            params += time_tuple
 
         if author is not None:
             author = self._normalize_nick(author)
             query += ' AND author=?'
             params += (author,)
+
+        if word is not None:
+            word = word.lower()
+            query += ' AND message LIKE ?'
+            params += ('%' + word + '%',)
 
         query += ' LIMIT 1 OFFSET %i' % random_skip
 
@@ -92,23 +98,25 @@ class Quotes:
         return '%s -- %s, %s' % (message, author, date)
 
     def quote_count(self, channel, author=None, year=None, word=None):
-        time_tuple = self._year_to_timestamps(year)
+        query = 'SELECT COUNT(*) FROM quotes WHERE channel=?'
+        params = (channel,)
 
-        if time_tuple is None:
-            return 0
-
-        query = 'SELECT COUNT(*) FROM quotes WHERE channel=? AND time>=? AND time<=?'
-        params = (channel,) + time_tuple
-
-        if word is not None:
-            word = word.lower()
-            query += ' AND message LIKE ?'
-            params += ('%' + word + '%',)
+        if year is not None:
+            time_tuple = self._year_to_timestamps(year)
+            if time_tuple is None:
+                return 0
+            query += ' AND time>=? AND time<=?'
+            params += time_tuple
 
         if author is not None:
             author = self._normalize_nick(author)
             query += ' AND author=?'
             params += (author,)
+
+        if word is not None:
+            word = word.lower()
+            query += ' AND message LIKE ?'
+            params += ('%' + word + '%',)
 
         cursor = self.db.cursor()
         cursor.execute(query, params)
