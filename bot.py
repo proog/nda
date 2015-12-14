@@ -183,17 +183,23 @@ class Bot:
         self._log(line)
         self.last_message = datetime.datetime.utcnow()
 
-        if len(data) > 1:
+        if len(data) < 2:  # smallest message we want is PING :msg
+            return
+
+        if not data[0].startswith(':'):  # distinguish between message formats
             command = data[0]
 
             if command == 'PING':
                 self._pong(' '.join(data[1:]).lstrip(':'))
             elif command == 'ERROR':
                 raise IRCError(line)
-        if len(data) > 3:
+        else:
             source = data[0].lstrip(':')
             source_nick = source.split('!')[0]
             command = data[1]
+
+            if '!' in source and source_nick not in self.nicks:  # update last seen whenever anything happens from some nick
+                self.mail.update_last_seen(source_nick)
 
             if command == '001':  # RPL_WELCOME: successful client registration
                 if self.nickserv_password is not None and len(self.nickserv_password) > 0:
@@ -348,6 +354,7 @@ class Bot:
                 '!porn: random porn link + longest comment',
                 '!quote [NICK] [YEAR] [?SEARCH]: get a random quote and optionally filter by nick, year or search word',
                 '!quotecount [NICK] [YEAR] [?SEARCH]: same as !quote, but get total number of matches instead',
+                '!seen NICK: when did the bot last see NICK?',
                 '!send NICK MESSAGE: deliver MESSAGE to NICK once it\'s online',
                 '!outbox: see your messages that haven\'t been delivered yet',
                 '!unsend ID: cancel delivery of message with the specified id (listed by !outbox)',
@@ -371,6 +378,7 @@ class Bot:
             '!send': send_mail,
             '!unsend': unsend_mail,
             '!outbox': outbox,
+            '!seen': lambda: self._send_message(reply_target, self.mail.last_seen(args[0])) if len(args) > 0 else None,
             # '!shell': shell_command,
             # '!up': lambda: multiline(reply_target, self.game.up()),
             # '!down': lambda: multiline(reply_target, self.game.down()),
