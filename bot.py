@@ -339,9 +339,25 @@ class Bot:
             else:
                 multiline(source_nick, messages)
 
+        def help():
+            multiline(source_nick, [
+                '!help: this message',
+                '!hi: say hi',
+                '!imgur: random imgur link',
+                '!reddit: random reddit link',
+                '!porn: random porn link + longest comment',
+                '!quote [NICK] [YEAR] [?SEARCH]: get a random quote and optionally filter by nick, year or search word',
+                '!quotecount [NICK] [YEAR] [?SEARCH]: same as !quote, but get total number of matches instead',
+                '!send NICK MESSAGE: deliver MESSAGE to NICK once it\'s online',
+                '!outbox: see your messages that haven\'t been delivered yet',
+                '!unsend ID: cancel delivery of message with the specified id (listed by !outbox)',
+                '!isitmovienight: is it movie night?',
+                '!uptime: time since coming online',
+            ])
+
         command = command.lower()
         commands = {
-            '!help': lambda: self._send_message(reply_target, 'https://github.com/proog/nda#commands'),
+            '!help': help,
             '!hi': lambda: self._send_message(reply_target, 'hi %s' % source_nick),
             '!imgur': lambda: self._send_message(reply_target, link_generator.imgur_link()),
             '!reddit': lambda: self._send_message(reply_target, link_generator.reddit_link()),
