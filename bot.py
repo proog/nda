@@ -254,17 +254,31 @@ class Bot:
         def parse_quote_command():
             author = None
             year = None
-            word = None
+            search_args = []
+            in_search = False
 
             for arg in args:
-                if re.match(r'^\?.+$', arg) is not None:
-                    word = arg[1:]
+                if in_search:
+                    if arg.endswith('"'):
+                        search_args.append(arg[:-1])
+                        in_search = False
+                    else:
+                        search_args.append(arg)
+                elif re.match(r'^\?.+$', arg) is not None:
+                    if arg.startswith('?"'):
+                        if arg.endswith('"'):
+                            search_args.append(arg[2:-1])
+                        else:
+                            search_args.append(arg[2:])
+                            in_search = True
+                    else:
+                        search_args = [arg[1:]]
                 elif re.match(r'^\d{4}$', arg) is not None:
                     year = int(arg)
                 else:
                     author = arg
 
-            return author, year, word
+            return author, year, ' '.join(search_args) if len(search_args) > 0 else None
 
         def uptime():
             connect_time = self.connect_time.strftime('%Y-%m-%d %H:%M:%S')
