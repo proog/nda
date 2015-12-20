@@ -34,8 +34,8 @@ class Channel:
 class Bot:
     buffer_size = 4096
     receive_timeout = 0.5
-    message_timeout = 180
-    passive_interval = 30  # how long between performing passive, input independent operations like mail
+    ping_timeout = 180
+    passive_interval = 60  # how long between performing passive, input independent operations like mail
     crlf = '\r\n'
 
     def __init__(self, conf_file):
@@ -57,7 +57,8 @@ class Bot:
         self.unfinished_line = ''
         self.nick_index = 0
         self.connect_time = None
-        self.last_message = None
+        self.last_ping = None
+        self.waiting_for_pong = False
         self.last_passive = None
         self.quotes = None
         self.mail = None
@@ -81,6 +82,10 @@ class Bot:
 
         for chunk in chunks:
             self._send(command + chunk + self.crlf)
+
+    def _ping(self, msg):
+        self._log('Sending PING :%s' % msg)
+        self._send('PING :%s' % msg)
 
     def _pong(self, msg):
         self._log('Sending PONG :%s' % msg)
@@ -140,7 +145,8 @@ class Bot:
         self.irc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.irc.connect((self.address, self.port))
         self.connect_time = datetime.datetime.utcnow()
-        self.last_message = datetime.datetime.utcnow()
+        self.waiting_for_pong = False
+        self.last_ping = datetime.datetime.utcnow()
         self.last_passive = datetime.datetime.utcnow()
         self._send('USER %s 8 * :%s' % (self.user, self.real_name))
         self._change_nick(self.nicks[self.nick_index])
@@ -156,38 +162,49 @@ class Bot:
         except OSError as os_error:
             self._log('An error occurred while disconnecting (%i): %s' % (os_error.errno, os_error.strerror))
 
+    def _execute_passive(self):
+        now = datetime.datetime.utcnow()
+
+        # if we don't receive a pong within the timeout, something strange happened and we want to reconnect
+        if self.waiting_for_pong and (now - self.last_ping).total_seconds() > self.ping_timeout:
+            raise IRCError('No PONG received from the server in %i seconds' % self.ping_timeout)
+
+        # perform various passive operations if the interval is up
+        if (now - self.last_passive).total_seconds() < self.passive_interval:
+            return
+
+        # ping the server
+        if not self.waiting_for_pong:
+            self._ping('nda')
+            self.waiting_for_pong = True
+            self.last_ping = datetime.datetime.utcnow()
+
+        # check if any nicks with unread messages have come online
+        unread_receivers = self.mail.unread_receivers()
+        if len(unread_receivers) > 0:
+            self._ison(unread_receivers)
+
+        # check if it's time to talk
+        for channel in self.channels:
+            if channel.idle_talk.can_talk() and False:
+                self._send_message(channel.name, channel.idle_talk.generate_message())
+
+        # check if it's time for a festive greeting
+        for channel_name, greeting in greetings.greet():
+            if channel_name in [c.name for c in self.channels]:
+                self._send_message(channel_name, greeting)
+
+        self.last_passive = datetime.datetime.utcnow()
+
     def _receive(self):
         line = self._readline()  # a line or None if nothing received
-
-        # if we don't receive any messages or pings for a while, something strange happened (like a netsplit)
-        if (datetime.datetime.utcnow() - self.last_message).total_seconds() > self.message_timeout:
-            raise IRCError('No message received from the server in %i seconds' % self.message_timeout)
-
-        # perform passive operations if the interval is up
-        if (datetime.datetime.utcnow() - self.last_passive).total_seconds() > self.passive_interval:
-            # check if any nicks with unread messages have come online
-            unread_receivers = self.mail.unread_receivers()
-            if len(unread_receivers) > 0:
-                self._ison(unread_receivers)
-
-            # check if it's time to talk
-            for channel in self.channels:
-                if channel.idle_talk.can_talk() and False:
-                    self._send_message(channel.name, channel.idle_talk.generate_message())
-
-            # check if it's time for a festive greeting
-            for channel_name, greeting in greetings.greet():
-                if channel_name in [c.name for c in self.channels]:
-                    self._send_message(channel_name, greeting)
-
-            self.last_passive = datetime.datetime.utcnow()
+        self._execute_passive()  # execute passive operations independent of input
 
         if line is None:
             return
 
         data = line.split()
         self._log(line)
-        self.last_message = datetime.datetime.utcnow()
 
         if len(data) < 2:  # smallest message we want is PING :msg
             return
@@ -222,6 +239,8 @@ class Bot:
                     self._log('Error: all nicks already in use')
                     raise KeyboardInterrupt
                 self._change_nick(self.nicks[self.nick_index])
+            elif command == 'PONG':
+                self.waiting_for_pong = False
             elif command == 'KICK':
                 time.sleep(2)
                 self._join(data[2])
