@@ -59,6 +59,8 @@ def youtube_lookup(message):
             for a, b in duration_replace.items():
                 duration = duration.replace(a, b)
             duration = ':'.join([x.zfill(2) for x in duration.split(':')]).lstrip('0')
+            if ':' not in duration:  # if under a minute, add 0: to the front
+                duration = '0:' + duration
             return '%s [%s]' % (title, duration)
         else:
             return None
