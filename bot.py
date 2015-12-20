@@ -176,10 +176,9 @@ class Bot:
                     self._send_message(channel.name, channel.idle_talk.generate_message())
 
             # check if it's time for a festive greeting
-            greeting = greetings.greet()
-            if greeting is not None:
-                for channel in self.channels:
-                    self._send_message(channel.name, greeting)
+            for channel_name, greeting in greetings.greet():
+                if channel_name in [c.name for c in self.channels]:
+                    self._send_message(channel_name, greeting)
 
             self.last_passive = datetime.datetime.utcnow()
 

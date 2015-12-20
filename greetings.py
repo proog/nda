@@ -5,9 +5,10 @@ from datetime import datetime
 
 
 class Greeting:
-    def __init__(self, dt, message):
+    def __init__(self, channel, dt, message):
         self.greet_time = datetime.min
         self.last_used = datetime.min
+        self.channel = channel
         self.message = message
         self.regenerate(dt)
 
@@ -37,14 +38,15 @@ class Greeting:
 
 def greet():
     now = datetime.utcnow()
+    ret = []
 
     for greeting in greetings:
         if greeting.matches(now):
             greeting.last_used = now
             greeting.regenerate(greeting.greet_time)
-            return greeting.message
+            ret.append((greeting.channel, greeting.message))
 
-    return None
+    return ret
 
 
 greetings = []
@@ -52,6 +54,7 @@ greetings = []
 if os.path.exists('greetings.conf'):
     with open('greetings.conf') as f:
         for json_greeting in json.load(f)['greetings']:
+            channel = json_greeting['channel']
             dt = datetime.strptime(json_greeting['date'], '%Y-%m-%d')
             message = json_greeting['message']
-            greetings.append(Greeting(dt, message))
+            greetings.append(Greeting(channel, dt, message))
