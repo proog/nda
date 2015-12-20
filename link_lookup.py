@@ -39,15 +39,26 @@ def youtube_lookup(message):
         return None
 
     try:
-        response = urllib.request.urlopen('https://www.googleapis.com/youtube/v3/videos?part=snippet&id=%s&key=%s' % (youtube_id, youtube_api_key))
+        response = urllib.request.urlopen('https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=%s&key=%s' % (youtube_id, youtube_api_key))
         data = response.read()
         json_data = json.loads(data.decode('utf-8'))
 
-        if 'items' in json_data \
-                and len(json_data['items']) > 0 \
-                and 'snippet' in json_data['items'][0] \
-                and 'title' in json_data['items'][0]['snippet']:
-            return json_data['items'][0]['snippet']['title']
+        if 'items' in json_data and len(json_data['items']) > 0:
+            title = json_data['items'][0]['snippet']['title']
+
+            duration_replace = {
+                'P': '',
+                'D': ':',
+                'T': '',
+                'H': ':',
+                'M': ':',
+                'S': ''
+            }
+            duration = json_data['items'][0]['contentDetails']['duration']
+            for a, b in duration_replace.items():
+                duration = duration.replace(a, b)
+            duration = ':'.join([x.zfill(2) for x in duration.split(':')]).lstrip('0')
+            return '%s [%s]' % (title, duration)
         else:
             return None
     except (HTTPError, URLError):
