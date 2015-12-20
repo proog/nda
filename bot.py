@@ -11,6 +11,7 @@ import unit_converter
 import shell
 import re
 import traceback
+import greetings
 from idle_talk import IdleTalk
 from quotes import Quotes
 from maze import Maze
@@ -173,6 +174,12 @@ class Bot:
             for channel in self.channels:
                 if channel.idle_talk.can_talk() and False:
                     self._send_message(channel.name, channel.idle_talk.generate_message())
+
+            # check if it's time for a festive greeting
+            greeting = greetings.greet()
+            if greeting is not None:
+                for channel in self.channels:
+                    self._send_message(channel.name, greeting)
 
             self.last_passive = datetime.datetime.utcnow()
 

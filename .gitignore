@@ -3,6 +3,7 @@ mail.db
 bot.conf
 quotes.conf
 rpg/save-*.json
+greetings.conf
 
 # Created by https://www.gitignore.io/api/python,intellij
 
