@@ -48,6 +48,7 @@ def youtube_lookup(message):
 
             duration_replace = {
                 'P': '',
+                'W': ':',
                 'D': ':',
                 'T': '',
                 'H': ':',
