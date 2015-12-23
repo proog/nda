@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 
 class Quotes:
     db_name = 'quotes.db'
+    garachat_exclude = (1407110400, 1410393599)  # 2014-08-04 - 2014-09-10
 
     def __init__(self, conf_file='quotes.conf'):
         with open(conf_file, 'r', encoding='utf-8') as file:
@@ -74,7 +75,7 @@ class Quotes:
             time_tuple = self._year_to_timestamps(year)
             if time_tuple is None:
                 return None
-            query += ' AND time>=? AND time<=?'
+            query += ' AND time BETWEEN ? AND ?'
             params += time_tuple
 
         if author is not None:
@@ -86,6 +87,11 @@ class Quotes:
             word = word.lower()
             query += ' AND message LIKE ?'
             params += ('%' + word + '%',)
+
+        # let's hide some stuff
+        if channel == '#garachat':
+            query += ' AND time NOT BETWEEN ? AND ?'
+            params += self.garachat_exclude
 
         query += ' LIMIT 1 OFFSET %i' % random_skip
 
@@ -105,7 +111,7 @@ class Quotes:
             time_tuple = self._year_to_timestamps(year)
             if time_tuple is None:
                 return 0
-            query += ' AND time>=? AND time<=?'
+            query += ' AND time BETWEEN ? AND ?'
             params += time_tuple
 
         if author is not None:
@@ -117,6 +123,11 @@ class Quotes:
             word = word.lower()
             query += ' AND message LIKE ?'
             params += ('%' + word + '%',)
+
+        # let's hide some stuff
+        if channel == '#garachat':
+            query += ' AND time NOT BETWEEN ? AND ?'
+            params += self.garachat_exclude
 
         cursor = self.db.cursor()
         cursor.execute(query, params)
