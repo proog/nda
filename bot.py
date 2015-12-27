@@ -404,7 +404,7 @@ class Bot:
         command = command.lower()
         commands = {
             '!help': help,
-            '!hi': lambda: self._send_message(reply_target, 'hi %s' % source_nick),
+            '!hi': lambda: self._send_message(reply_target, 'hi %s, jag heter %s, %s heter jag' % (source_nick, self.nicks[self.nick_index], self.nicks[self.nick_index])),
             '!imgur': lambda: self._send_message(reply_target, link_generator.imgur_link()),
             '!reddit': lambda: self._send_message(reply_target, link_generator.reddit_link()),
             '!uptime': uptime,
