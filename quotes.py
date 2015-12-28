@@ -44,6 +44,11 @@ class Quotes:
         time_max = int(datetime(year, 12, 31, 23, 59, 59).timestamp())
         return time_min, time_max
 
+    def _escape_like(self, word):
+        for char in ['\\', '%', '_']:
+            word = word.replace(char, '\\' + char)
+        return word
+
     def add_quote(self, channel, timestamp, author, message, commit=True):
         author = self._normalize_nick(author)
         message = message.rstrip()  # remove trailing whitespace from message
@@ -84,9 +89,9 @@ class Quotes:
             params += (author,)
 
         if word is not None:
-            word = word.lower()
-            query += ' AND message LIKE ?'
-            params += ('%' + word + '%',)
+            word = self._escape_like(word.lower())
+            query += ' AND message LIKE ? ESCAPE ?'
+            params += ('%' + word + '%', '\\')
 
         # let's hide some stuff
         if channel == '#garachat':
@@ -120,9 +125,9 @@ class Quotes:
             params += (author,)
 
         if word is not None:
-            word = word.lower()
-            query += ' AND message LIKE ?'
-            params += ('%' + word + '%',)
+            word = self._escape_like(word.lower())
+            query += ' AND message LIKE ? ESCAPE ?'
+            params += ('%' + word + '%', '\\')
 
         # let's hide some stuff
         if channel == '#garachat':
