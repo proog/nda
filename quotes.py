@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 
 class Quotes:
     db_name = 'quotes.db'
-    garachat_exclude = (1407110400, 1410393599)  # 2014-08-04 - 2014-09-10
 
     def __init__(self, conf_file='quotes.conf'):
         with open(conf_file, 'r', encoding='utf-8') as file:
@@ -49,6 +48,34 @@ class Quotes:
             word = word.replace(char, '\\' + char)
         return word
 
+    def _build_where(self, channel, author=None, year=None, word=None):
+        query = 'channel=?'
+        params = (channel,)
+
+        if year is not None:
+            time_tuple = self._year_to_timestamps(year)
+            if time_tuple is None:
+                return None
+            query += ' AND time BETWEEN ? AND ?'
+            params += time_tuple
+
+        if author is not None:
+            author = self._normalize_nick(author)
+            query += ' AND author=?'
+            params += (author,)
+
+        if word is not None:
+            word = self._escape_like(word.lower())
+            query += ' AND message LIKE ? ESCAPE ?'
+            params += ('%' + word + '%', '\\')
+
+        # let's hide some stuff
+        if channel == '#garachat':
+            query += ' AND time NOT BETWEEN ? AND ?'
+            params += (1407110400, 1410393599)  # 2014-08-04 - 2014-09-10
+
+        return query, params
+
     def add_quote(self, channel, timestamp, author, message, commit=True):
         author = self._normalize_nick(author)
         message = message.rstrip()  # remove trailing whitespace from message
@@ -73,32 +100,8 @@ class Quotes:
             return None
 
         random_skip = random.randint(0, num_rows - 1)
-        query = 'SELECT time, author, message FROM quotes WHERE channel=?'
-        params = (channel,)
-
-        if year is not None:
-            time_tuple = self._year_to_timestamps(year)
-            if time_tuple is None:
-                return None
-            query += ' AND time BETWEEN ? AND ?'
-            params += time_tuple
-
-        if author is not None:
-            author = self._normalize_nick(author)
-            query += ' AND author=?'
-            params += (author,)
-
-        if word is not None:
-            word = self._escape_like(word.lower())
-            query += ' AND message LIKE ? ESCAPE ?'
-            params += ('%' + word + '%', '\\')
-
-        # let's hide some stuff
-        if channel == '#garachat':
-            query += ' AND time NOT BETWEEN ? AND ?'
-            params += self.garachat_exclude
-
-        query += ' LIMIT 1 OFFSET %i' % random_skip
+        where, params = self._build_where(channel, author, year, word)
+        query = 'SELECT time, author, message FROM quotes WHERE %s LIMIT 1 OFFSET %i' % (where, random_skip)
 
         cursor = self.db.cursor()
         cursor.execute(query, params)
@@ -109,30 +112,8 @@ class Quotes:
         return '%s -- %s, %s' % (message, author, date)
 
     def quote_count(self, channel, author=None, year=None, word=None):
-        query = 'SELECT COUNT(*) FROM quotes WHERE channel=?'
-        params = (channel,)
-
-        if year is not None:
-            time_tuple = self._year_to_timestamps(year)
-            if time_tuple is None:
-                return 0
-            query += ' AND time BETWEEN ? AND ?'
-            params += time_tuple
-
-        if author is not None:
-            author = self._normalize_nick(author)
-            query += ' AND author=?'
-            params += (author,)
-
-        if word is not None:
-            word = self._escape_like(word.lower())
-            query += ' AND message LIKE ? ESCAPE ?'
-            params += ('%' + word + '%', '\\')
-
-        # let's hide some stuff
-        if channel == '#garachat':
-            query += ' AND time NOT BETWEEN ? AND ?'
-            params += self.garachat_exclude
+        where, params = self._build_where(channel, author, year, word)
+        query = 'SELECT COUNT(*) FROM quotes WHERE %s' % where
 
         cursor = self.db.cursor()
         cursor.execute(query, params)
