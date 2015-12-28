@@ -121,6 +121,14 @@ class Quotes:
 
         return int(count)
 
+    def top(self, channel, size=5, year=None, word=None):
+        where, params = self._build_where(channel, None, year, word)
+        query = 'SELECT author, COUNT(*) AS c FROM quotes WHERE %s GROUP BY author ORDER BY c DESC LIMIT %i' % (where, size)
+
+        cursor = self.db.cursor()
+        cursor.execute(query, params)
+        return ['%s: %i quotes' % (a, c) for a, c in cursor.fetchall() if c > 0]
+
     def import_irssi_log(self, filename, channel, utc_offset=0):
         utc_offset_padded = ('+' if utc_offset >= 0 else '') + str(utc_offset).zfill(2 if utc_offset >= 0 else 3) + '00'
         lines = 0

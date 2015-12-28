@@ -83,6 +83,10 @@ class Bot:
         for chunk in chunks:
             self._send(command + chunk + self.crlf)
 
+    def _send_messages(self, to, msgs):
+        for msg in msgs:
+            self._send_message(to, msg)
+
     def _ping(self, msg):
         self._log('Sending PING :%s' % msg)
         self._send('PING :%s' % msg)
@@ -108,8 +112,7 @@ class Bot:
         messages = self.mail.unread_messages(to)
         if len(messages) > 0:
             self._send_message(to, 'you have %i unread message(s)' % len(messages))
-            for message in messages:
-                self._send_message(to, message)
+            self._send_messages(to, messages)
 
     def _log(self, msg):
         msg = '%s %s' % (datetime.datetime.utcnow(), msg)
@@ -335,6 +338,18 @@ class Bot:
             count = self.quotes.quote_count(reply_target, author, year, word)
             self._send_message(reply_target, '%i quotes' % count)
 
+        def quote_top():
+            if reply_target not in [c.name for c in self.channels]:
+                self._send_message(reply_target, 'command only available in channel :(')
+                return
+
+            author, year, word = parse_quote_command()
+            top = self.quotes.top(reply_target, 5, year, word)
+            if len(top) > 0:
+                self._send_messages(reply_target, top)
+            else:
+                self._send_message(reply_target, 'no quotes found :(')
+
         def update():
             if source_nick not in self.trusted_nicks:
                 self._send_message(reply_target, 'how about no >:(')
@@ -349,17 +364,13 @@ class Bot:
 
         def shell_command():
             if source_nick in self.trusted_nicks:
-                for line in shell.run(' '.join(args)):
-                    self._send_message(reply_target, line)
-
-        def multiline(to, lines):
-            for line in lines:
-                self._send_message(to, line)
+                output = shell.run(' '.join(args))
+                self._send_messages(reply_target, output)
 
         def rpg_action():
             for channel in self.channels:
                 if reply_target == channel.name:  # only allow rpg play in channel
-                    multiline(reply_target, channel.rpg.action(' '.join(args)))
+                    self._send_messages(reply_target, channel.rpg.action(' '.join(args)))
 
         def send_mail():
             if len(args) < 2:
@@ -382,10 +393,10 @@ class Bot:
             if len(messages) == 0:
                 self._send_message(source_nick, 'no unsent messages')
             else:
-                multiline(source_nick, messages)
+                self._send_messages(source_nick, messages)
 
         def help():
-            multiline(source_nick, [
+            self._send_messages(source_nick, [
                 '!help: this message',
                 '!hi: say hi',
                 '!imgur: random imgur link',
@@ -393,6 +404,7 @@ class Bot:
                 '!porn: random porn link + longest comment',
                 '!quote [NICK] [YEAR] [?SEARCH]: get a random quote and optionally filter by nick, year or search word',
                 '!quotecount [NICK] [YEAR] [?SEARCH]: same as !quote, but get total number of matches instead',
+                '!quotetop [YEAR] [?SEARCH]: get the top 5 nicks for the specified year and/or search string',
                 '!seen NICK: when did the bot last see NICK?',
                 '!send NICK MESSAGE: deliver MESSAGE to NICK once it\'s online',
                 '!outbox: see your messages that haven\'t been delivered yet',
@@ -411,6 +423,7 @@ class Bot:
             '!porn': porn,
             '!quote': quote,
             '!quotecount': quote_count,
+            '!quotetop': quote_top,
             '!update': update,
             '!isitmovienight': lambda: self._send_message(reply_target, 'maybe :)' if datetime.datetime.utcnow().weekday() in [4, 5] else 'no :('),
             '!rpg': rpg_action,
@@ -419,12 +432,12 @@ class Bot:
             '!outbox': outbox,
             '!seen': lambda: self._send_message(reply_target, self.mail.last_seen(args[0])) if len(args) > 0 else None,
             # '!shell': shell_command,
-            # '!up': lambda: multiline(reply_target, self.game.up()),
-            # '!down': lambda: multiline(reply_target, self.game.down()),
-            # '!left': lambda: multiline(reply_target, self.game.left()),
-            # '!right': lambda: multiline(reply_target, self.game.right()),
-            # '!look': lambda: multiline(reply_target, self.game.look()),
-            # '!restart': lambda: multiline(reply_target, self.game.restart())
+            # '!up': lambda: self._send_multiline_message(reply_target, self.game.up()),
+            # '!down': lambda: self._send_multiline_message(reply_target, self.game.down()),
+            # '!left': lambda: self._send_multiline_message(reply_target, self.game.left()),
+            # '!right': lambda: self._send_multiline_message(reply_target, self.game.right()),
+            # '!look': lambda: self._send_multiline_message(reply_target, self.game.look()),
+            # '!restart': lambda: self._send_multiline_message(reply_target, self.game.restart())
         }
 
         if command in commands:
