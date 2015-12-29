@@ -402,15 +402,16 @@ class Bot:
                 '!imgur: random imgur link',
                 '!reddit: random reddit link',
                 '!porn: random porn link + longest comment',
-                '!quote [NICK] [YEAR] [?SEARCH]: get a random quote and optionally filter by nick, year or search word',
+                '!quote [NICK] [YEAR] [?SEARCH]: get a random quote and optionally filter by nick, year or search string. Search string can be enclosed in quotes (?"") to allow spaces',
                 '!quotecount [NICK] [YEAR] [?SEARCH]: same as !quote, but get total number of matches instead',
-                '!quotetop [YEAR] [?SEARCH]: get the top 5 nicks for the specified year and/or search string',
+                '!quotetop [YEAR] [?SEARCH]: get the top 5 nicks by number of quotes',
                 '!seen NICK: when did the bot last see NICK?',
                 '!send NICK MESSAGE: deliver MESSAGE to NICK once it\'s online',
                 '!outbox: see your messages that haven\'t been delivered yet',
                 '!unsend ID: cancel delivery of message with the specified id (listed by !outbox)',
                 '!isitmovienight: is it movie night?',
                 '!uptime: time since coming online',
+                '!rpg [ACTION]: play the GOTY right here'
             ])
 
         command = command.lower()
