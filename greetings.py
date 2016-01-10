@@ -9,7 +9,7 @@ class Greeting:
         self.channel = channel
         self.repeat = repeat
         self.message = message
-        self.last_used = last_used if last_used is not None else datetime.min
+        self.last_used = last_used if last_used is not None else datetime(1970, 1, 1)
         self.greet_time = datetime(year=dt.year,
                                    month=dt.month,
                                    day=dt.day,
