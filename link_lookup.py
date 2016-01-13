@@ -122,7 +122,7 @@ def generic_lookup(message):
         parser.feed(response.read().decode('utf-8'))
         title = parser.title
 
-        return title if title is not None and len(title) > 0 else None
+        return title if title is not None and len(title.split()) > 1 else None
     except (HTTPError, URLError, UnicodeDecodeError):
         return None
 
