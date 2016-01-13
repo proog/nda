@@ -6,6 +6,7 @@ import random
 from urllib.error import *
 
 
+timeout = 5
 youtube_api_key = None
 user_agents = [
     'Mozilla/5.0 (X11; U; Linux i686) Gecko/20071127 Firefox/2.0.0.11',
@@ -39,7 +40,10 @@ def youtube_lookup(message):
         return None
 
     try:
-        response = urllib.request.urlopen('https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=%s&key=%s' % (youtube_id, youtube_api_key))
+        response = urllib.request.urlopen(
+            'https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=%s&key=%s' % (youtube_id, youtube_api_key),
+            timeout=timeout
+        )
         data = response.read()
         json_data = json.loads(data.decode('utf-8'))
 
@@ -113,7 +117,7 @@ def generic_lookup(message):
             'Accept-Language': 'en-US',  # to avoid geo-specific response language from e.g. twitter
             'User-Agent': random.choice(user_agents)
         })
-        response = urllib.request.urlopen(request)
+        response = urllib.request.urlopen(request, timeout=timeout)
 
         if response.status != 200 or 'text/html' not in response.getheader('Content-Type', '').lower():
             return None
@@ -157,7 +161,7 @@ def xhamster_comment(link):
         request = urllib.request.Request(link, headers={
             'User-Agent': random.choice(user_agents)
         })
-        response = urllib.request.urlopen(request)
+        response = urllib.request.urlopen(request, timeout=timeout)
         parser.feed(response.read().decode('utf-8'))
     except:
         return 'couldn\'t load comments :('

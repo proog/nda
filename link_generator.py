@@ -3,6 +3,7 @@ import http.client
 import random
 
 
+timeout = 5
 lowercase_chars = 'abcdefghijklmnopqrstuvwxyz'
 uppercase_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 numbers = '0123456789'
@@ -20,7 +21,7 @@ def imgur_link():
         combination = generate_combination(chars, 5)
 
         try:
-            connection = http.client.HTTPConnection('i.imgur.com')
+            connection = http.client.HTTPConnection('i.imgur.com', timeout=timeout)
             connection.request('HEAD', '/%s.jpg' % combination)
             response = connection.getresponse()
 
@@ -39,7 +40,7 @@ def reddit_link():
         combination = generate_combination(chars, 4)
 
         try:
-            connection = http.client.HTTPSConnection('www.reddit.com')
+            connection = http.client.HTTPSConnection('www.reddit.com', timeout=timeout)
             connection.request('HEAD', '/r/all/comments/3t%s' % combination)
             response = connection.getresponse()
 
@@ -59,7 +60,7 @@ def xhamster_link():
 
     for attempt in range(0, max_tries):
         try:
-            connection = http.client.HTTPConnection('xhamster.com')
+            connection = http.client.HTTPConnection('xhamster.com', timeout=timeout)
             connection.request('HEAD', '/random.php', headers=headers)
             response = connection.getresponse()
             location = response.getheader('Location', None)
