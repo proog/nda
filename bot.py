@@ -258,6 +258,7 @@ class Bot:
 
     def _parse_message(self, message, reply_target, source_nick):
         tokens = message.split()
+        _, _, raw_args = message.partition(' ')
 
         if len(tokens) == 0:
             return  # don't process empty or whitespace-only messages
@@ -266,7 +267,7 @@ class Bot:
             tokens[0] = ' ' + tokens[0]  # any initial space is removed by str.split(), so we put it back here
 
         # explicit commands
-        handled = self._explicit_command(tokens[0], tokens[1:] if len(tokens) > 1 else [], reply_target, source_nick)
+        handled = self._explicit_command(tokens[0], tokens[1:] if len(tokens) > 1 else [], reply_target, source_nick, raw_args)
 
         if not handled:
             # implicit commands
@@ -278,35 +279,30 @@ class Bot:
                     timestamp = int(datetime.datetime.utcnow().timestamp())
                     self.quotes.add_quote(channel.name, timestamp, source_nick, message)  # add message to the quotes database
 
-    def _explicit_command(self, command, args, reply_target, source_nick):
+    def _explicit_command(self, command, args, reply_target, source_nick, raw_args):
         def parse_quote_command():
             author = None
             year = None
-            search_args = []
-            in_search = False
+            search = ''
+            raw_args_nosearch = raw_args
 
-            for arg in args:
-                if in_search:
-                    if arg.endswith('"'):
-                        search_args.append(arg[:-1])
-                        in_search = False
-                    else:
-                        search_args.append(arg)
-                elif re.match(r'^\?.+$', arg) is not None:
-                    if arg.startswith('?"'):
-                        if arg.endswith('"'):
-                            search_args.append(arg[2:-1])
-                        else:
-                            search_args.append(arg[2:])
-                            in_search = True
-                    else:
-                        search_args = [arg[1:]]
-                elif re.match(r'^\d{4}$', arg) is not None:
+            multiword_match = re.match(r'\?"(.*)"', raw_args)
+            singleword_match = re.match(r'\?([^\s]+)', raw_args)
+
+            if multiword_match is not None:
+                search = multiword_match.group(1)
+                raw_args_nosearch = raw_args.replace('?"' + search + '"', '')
+            elif singleword_match is not None:
+                search = singleword_match.group(1)
+                raw_args_nosearch = raw_args.replace('?' + search, '')
+
+            for arg in raw_args_nosearch.split():
+                if re.match(r'^\d{4}$', arg) is not None:
                     year = int(arg)
                 else:
                     author = arg
 
-            return author, year, ' '.join(search_args) if len(search_args) > 0 else None
+            return author, year, search if len(search) > 0 else None
 
         def uptime():
             connect_time = self.connect_time.strftime('%Y-%m-%d %H:%M:%S')
