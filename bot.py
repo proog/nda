@@ -286,8 +286,8 @@ class Bot:
             search = ''
             raw_args_nosearch = raw_args
 
-            multiword_match = re.match(r'\?"(.*)"', raw_args)
-            singleword_match = re.match(r'\?([^\s]+)', raw_args)
+            multiword_match = re.search(r'\?"(.*)"', raw_args)
+            singleword_match = re.search(r'\?([^\s]+)', raw_args)
 
             if multiword_match is not None:
                 search = multiword_match.group(1)
