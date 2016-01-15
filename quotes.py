@@ -177,6 +177,52 @@ class Quotes:
         print('%i messages total' % messages)
         print('%i lines total' % lines)
 
+    def import_hexchat_log(self, filename, channel, utc_offset=0):
+        utc_offset_padded = ('+' if utc_offset >= 0 else '') + str(utc_offset).zfill(2 if utc_offset >= 0 else 3) + '00'
+        lines = 0
+        messages = 0
+        imported = 0
+        skipped = 0
+        year = 1970
+
+        with open(filename, 'r', encoding='utf-8') as log:
+            for line in log:
+                lines += 1
+
+                if lines % 20000 == 0:
+                    self.db.commit()  # commit every 20000 lines for performance
+                    print('processing line %i' % lines)
+
+                line = line.strip()
+                year_match = re.match(r'^\*\*\*\* BEGIN LOGGING AT .* (\d{4})$', line)
+
+                if year_match is not None:
+                    year = int(year_match.group(1))
+                    continue
+
+                match = re.match(r'^(.{15})\s<(.+?)>\s(.+)$', line)  # jan 01 12:34:56 <author> message
+
+                if match is None:
+                    continue
+
+                messages += 1
+                log_time_tz = '%s %i %s' % (match.group(1), year, utc_offset_padded)
+                log_time = datetime.strptime(log_time_tz, '%b %d %X %Y %z')
+                timestamp = int(log_time.astimezone(timezone.utc).timestamp())
+                author = match.group(2)
+                message = match.group(3)
+
+                if self.add_quote(channel, timestamp, author, message, False):
+                    imported += 1
+                else:
+                    skipped += 1
+
+        self.db.commit()  # do a final commit if some insertions were left over
+        print('Imported %i messages' % imported)
+        print('Skipped %i messages' % skipped)
+        print('%i messages total' % messages)
+        print('%i lines total' % lines)
+
     def dump_irssi_log_authors(self, filename):
         authors = {}
 
