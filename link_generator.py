@@ -65,8 +65,24 @@ def xhamster_link():
             response = connection.getresponse()
             location = response.getheader('Location', None)
 
-            # sometimes their randomizer fails and redirects to the front page
+            # sometimes their randomizer fails and redirects to the front page, try again if that happens
             if response.status == 302 and location is not None and location != 'http://xhamster.com':
+                return location
+        except http.client.HTTPException:
+            return 'connection failed, please try again later :('
+
+    return 'couldn\'t find a valid link in %i tries :(' % max_tries
+
+
+def wikihow_link():
+    for attempt in range(0, max_tries):
+        try:
+            connection = http.client.HTTPConnection('www.wikihow.com', timeout=timeout)
+            connection.request('HEAD', '/Special:Randomizer')
+            response = connection.getresponse()
+            location = response.getheader('Location', None)
+
+            if response.status == 302 and location is not None:
                 return location
         except http.client.HTTPException:
             return 'connection failed, please try again later :('
@@ -76,3 +92,4 @@ def xhamster_link():
 
 if __name__ == '__main__':
     print('found: ' + xhamster_link())
+    print('found: ' + wikihow_link())
