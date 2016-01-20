@@ -13,7 +13,7 @@ import re
 import traceback
 import greetings
 from idle_talk import IdleTalk
-from quotes import Quotes
+from quotes import SqliteQuotes
 from maze import Maze
 from rpg.main import RPG
 from mail import Mail
@@ -478,7 +478,7 @@ class Bot:
         self.lines = []
         self.unfinished_line = ''
         self.nick_index = 0
-        self.quotes = Quotes()
+        self.quotes = SqliteQuotes()
         self.mail = Mail()
 
         self._connect()
