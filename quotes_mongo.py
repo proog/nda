@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 class Quotes:
     db_name = 'nda'
     collection_name = 'quotes'
+    eager_word_count = False
 
     def __init__(self, conf_file='quotes.conf'):
         with open(conf_file, 'r', encoding='utf-8') as file:
@@ -17,7 +18,12 @@ class Quotes:
             self.aliases = conf['aliases']
 
         self.mongo = MongoClient()
-        self.mongo[self.db_name][self.collection_name].create_index([('message', TEXT)])
+        collection = self.mongo[self.db_name][self.collection_name]
+        collection.create_index('channel')
+        collection.create_index('time')
+        collection.create_index('author')
+        collection.create_index([('message', TEXT)])
+        collection.create_index('word_count')
 
     def _normalize_nick(self, nick):
         nick = nick.lower().strip('_ ') # try to normalize nicks to lowercase versions and no alts
@@ -43,7 +49,7 @@ class Quotes:
         message = message.rstrip()  # remove trailing whitespace from message
         word_count = len(message.split())
 
-        if timestamp == 0 or len(author) == 0 or word_count < 5 or author in self.ignore_nicks:
+        if timestamp == 0 or len(author) == 0 or (self.eager_word_count and word_count < 5) or author in self.ignore_nicks:
             return None
 
         return {
@@ -58,6 +64,11 @@ class Quotes:
         query = {
             'channel': channel
         }
+
+        if not self.eager_word_count:
+            query['word_count'] = {
+                '$gte': 5
+            }
 
         if year is not None:
             time_tuple = self._year_to_timestamps(year)
@@ -79,6 +90,14 @@ class Quotes:
             query['$text'] = {
                 '$search': '\"%s\"' % word
             }
+
+        # let's hide some stuff
+        if channel == '#garachat':
+            query['$or'] = [{
+                'time': {'$lt': 1407110400}  # 2014-08-04
+            }, {
+                'time': {'$gt': 1410393599}  # 2014-09-10
+            }]
 
         return query
 
@@ -107,6 +126,24 @@ class Quotes:
     def quote_count(self, channel, author=None, year=None, word=None):
         query = self._query(channel, author, year, word)
         return self.mongo[self.db_name][self.collection_name].find(query).count()
+
+    def top(self, channel, size=5, year=None, word=None):
+        query = self._query(channel, None, year, word)
+
+        aggregate = self.mongo[self.db_name][self.collection_name].aggregate([{
+            '$match': query
+        }, {
+            '$group': {
+                '_id': '$author',
+                'count': {'$sum': 1}
+            }
+        }, {
+            '$sort': {'count': -1}
+        }, {
+            '$limit': size
+        }])
+
+        return ['%s: %i quotes' % (doc['_id'], doc['count']) for doc in aggregate if doc['count'] > 0]
 
     def import_irssi_log(self, filename, channel, utc_offset=0):
         utc_offset_padded = ('+' if utc_offset >= 0 else '') + str(utc_offset).zfill(2 if utc_offset >= 0 else 3) + '00'
@@ -157,7 +194,62 @@ class Quotes:
                 else:
                     skipped += 1
 
-        #  final insert if some were left over
+        # final insert if some were left over
+        insert()
+
+        print('Imported %i messages' % imported)
+        print('Skipped %i messages' % skipped)
+        print('%i messages total' % messages)
+        print('%i lines total' % lines)
+
+    def import_hexchat_log(self, filename, channel, utc_offset=0):
+        utc_offset_padded = ('+' if utc_offset >= 0 else '') + str(utc_offset).zfill(2 if utc_offset >= 0 else 3) + '00'
+        lines = 0
+        messages = 0
+        imported = 0
+        skipped = 0
+        year = 1970
+        documents = []
+
+        def insert():
+            self.mongo[self.db_name][self.collection_name].insert_many(documents)
+            documents.clear()
+
+        with open(filename, 'r', encoding='utf-8') as log:
+            for line in log:
+                lines += 1
+
+                if lines % 20000 == 0:
+                    insert()
+                    print('processing line %i' % lines)
+
+                line = line.strip()
+                year_match = re.match(r'^\*\*\*\* BEGIN LOGGING AT .* (\d{4})$', line)
+
+                if year_match is not None:
+                    year = int(year_match.group(1))
+                    continue
+
+                match = re.match(r'^(.{15})\s<(.+?)>\s(.+)$', line)  # jan 01 12:34:56 <author> message
+
+                if match is None:
+                    continue
+
+                messages += 1
+                log_time_tz = '%s %i %s' % (match.group(1), year, utc_offset_padded)
+                log_time = datetime.strptime(log_time_tz, '%b %d %X %Y %z')
+                timestamp = int(log_time.astimezone(timezone.utc).timestamp())
+                author = match.group(2)
+                message = match.group(3)
+
+                document = self._document(channel, timestamp, author, message)
+                if document is not None:
+                    imported += 1
+                    documents.append(document)
+                else:
+                    skipped += 1
+
+        # final insert if some were left over
         insert()
 
         print('Imported %i messages' % imported)
@@ -194,7 +286,8 @@ if __name__ == '__main__':
     #        print('%s %i' % (nick, msg_count))
     #q.add_quote('#garachat', 0, 'ashin', '( ͡° ͜ʖ ͡°)')
     #q.import_irssi_log('gclogs/#garachat-master.log', '#garachat', 0)
-    print(q.random_quote(channel='#garachat', author='garamond', year=2010))
+    print(q.top(channel='#garachat', size=5))
+    print(q.random_quote(channel='#garachat', author='ashin', year=2010))
     print(q.quote_count(channel='#garachat', author='sarah'))
-    print(q.random_quote(channel='#garachat', word='fuck'))
+    print(q.random_quote(channel='#garachat', author='duo', word='fuck you guys'))
     q.close()
