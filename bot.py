@@ -69,6 +69,12 @@ class Bot:
         self.mail = None
         self.twitter = None
 
+    def _get_channel(self, name):
+        for channel in self.channels:
+            if name == channel.name:
+                return channel
+        return None
+
     def _send(self, msg):
         if not msg.endswith(self.crlf):
             msg += self.crlf
@@ -273,19 +279,23 @@ class Bot:
             tokens[0] = ' ' + tokens[0]  # any initial space is removed by str.split(), so we put it back here
 
         # explicit commands
-        handled = self._explicit_command(tokens[0], tokens[1:] if len(tokens) > 1 else [], reply_target, source_nick, raw_args)
+        command = tokens[0]
+        args = tokens[1:] if len(tokens) > 1 else []
+        handled = self._explicit_command(command, args, reply_target, source_nick, raw_args)
 
         if not handled:
             # implicit commands
             self._implicit_command(message, reply_target, source_nick)
 
-            for channel in self.channels:
-                if reply_target == channel.name:
-                    channel.idle_talk.add_message(message)  # add message to the idle talk log
-                    timestamp = int(datetime.datetime.utcnow().timestamp())
-                    self.quotes.add_quote(channel.name, timestamp, source_nick, message)  # add message to the quotes database
+            channel = self._get_channel(reply_target)
+            if channel is not None:
+                channel.idle_talk.add_message(message)  # add message to the idle talk log
+                timestamp = int(datetime.datetime.utcnow().timestamp())
+                self.quotes.add_quote(channel.name, timestamp, source_nick, message)  # add message to the quotes database
 
     def _explicit_command(self, command, args, reply_target, source_nick, raw_args):
+        channel = self._get_channel(reply_target)
+
         def parse_quote_command():
             author = None
             year = None
@@ -323,7 +333,7 @@ class Bot:
                 self._send_message(reply_target, comment)
 
         def quote():
-            if reply_target not in [c.name for c in self.channels]:  # only allow quote requests in a channel
+            if channel is None:  # only allow quote requests in a channel
                 self._send_message(reply_target, 'command only available in channel :(')
                 return
 
@@ -332,7 +342,7 @@ class Bot:
             self._send_message(reply_target, random_quote if random_quote is not None else 'no quotes found :(')
 
         def quote_count():
-            if reply_target not in [c.name for c in self.channels]:
+            if channel is None:
                 self._send_message(reply_target, 'command only available in channel :(')
                 return
 
@@ -341,7 +351,7 @@ class Bot:
             self._send_message(reply_target, '%i quotes' % count)
 
         def quote_top():
-            if reply_target not in [c.name for c in self.channels]:
+            if channel is None:
                 self._send_message(reply_target, 'command only available in channel :(')
                 return
 
@@ -370,9 +380,10 @@ class Bot:
                 self._send_messages(reply_target, output)
 
         def rpg_action():
-            for channel in self.channels:
-                if reply_target == channel.name:  # only allow rpg play in channel
-                    self._send_messages(reply_target, channel.rpg.action(' '.join(args)))
+            if channel is None:  # only allow rpg play in channel
+                self._send_message(reply_target, 'command only available in channel :(')
+                return
+            self._send_messages(reply_target, channel.rpg.action(' '.join(args)))
 
         def send_mail():
             if len(args) < 2:
@@ -398,9 +409,16 @@ class Bot:
                 self._send_messages(source_nick, messages)
 
         def tweet():
-            if reply_target not in [c.name for c in self.channels]:
+            if channel is None:
                 self._send_message(reply_target, 'command only available in channel :(')
-            self._send_message(reply_target, 'sent :)' if self.twitter.tweet(raw_args) else 'not sent :(')
+                return
+
+            if self.twitter.tweet(raw_args):
+                self._send_message(reply_target, 'sent :)')
+            else:
+                delay = self.twitter.next_tweet_delay()
+                reason = 'in %i seconds' % delay if delay > 0 else 'now, but something went wrong'
+                self._send_message(reply_target, 'not sent (next tweet available %s) :(' % reason)
 
         def help():
             self._send_messages(source_nick, [

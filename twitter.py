@@ -1,8 +1,14 @@
 import tweepy
+from datetime import datetime
 
 
 class Twitter:
+    tweet_rate = 17280  # 5 tweets a day
+
     def __init__(self, consumer_key, consumer_secret, access_token, access_token_secret):
+        self.last_tweet = datetime.min
+        self.api = None
+
         try:
             for v in [consumer_key, consumer_secret, access_token, access_token_secret]:
                 if v is None or len(v) == 0:
@@ -12,14 +18,15 @@ class Twitter:
             auth.set_access_token(access_token, access_token_secret)
             self.api = tweepy.API(auth)
         except:
-            self.api = None
+            pass
 
     def tweet(self, msg):
-        if self.api is None or len(msg.strip()) == 0:
+        if self.api is None or len(msg.strip()) == 0 or self.next_tweet_delay() > 0:
             return False
 
         try:
             self.api.update_status(msg)
+            self.last_tweet = datetime.utcnow()
             return True
         except (tweepy.TweepError, tweepy.RateLimitError):
             return False
@@ -32,6 +39,10 @@ class Twitter:
             return self.api.get_status(tweet_id)
         except (tweepy.TweepError, tweepy.RateLimitError):
             return None
+
+    def next_tweet_delay(self):
+        diff = self.tweet_rate - (datetime.utcnow() - self.last_tweet).total_seconds()
+        return max(int(diff), 0)
 
 
 if __name__ == '__main__':
