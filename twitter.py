@@ -25,9 +25,9 @@ class Twitter:
             return False
 
         try:
-            self.api.update_status(msg)
+            result = self.api.update_status(msg)
             self.last_tweet = datetime.utcnow()
-            return True
+            return result.url
         except (tweepy.TweepError, tweepy.RateLimitError):
             return False
 
