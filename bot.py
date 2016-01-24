@@ -416,9 +416,8 @@ class Bot:
                 self._send_message(reply_target, 'tweet too long (%i characters) :(' % len(raw_args))
                 return
 
-            tweet_url = self.twitter.tweet(raw_args)
-            if tweet_url is not False:
-                self._send_message(reply_target, 'sent (%s) :)' % tweet_url)
+            if self.twitter.tweet(raw_args):
+                self._send_message(reply_target, 'sent :)')
             else:
                 delay = self.twitter.next_tweet_delay()
                 reason = 'in %i seconds' % delay if delay > 0 else 'now, but something went wrong'
