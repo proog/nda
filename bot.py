@@ -17,6 +17,7 @@ from quotes import SqliteQuotes
 from maze import Maze
 from rpg.main import RPG
 from mail import Mail
+from twitter import Twitter
 
 
 class IRCError(Exception):
@@ -51,7 +52,11 @@ class Bot:
             self.trusted_nicks = conf.get('trusted_nicks', [])
             self.quit_message = conf.get('quit_message', '')
             self.logging = conf.get('logging', False)
-            link_lookup.youtube_api_key = conf.get('youtube_api_key', None)
+            self.youtube_api_key = conf.get('youtube_api_key', None)
+            self.twitter_consumer_key = conf.get('twitter_consumer_key', None)
+            self.twitter_consumer_secret = conf.get('twitter_consumer_secret', None)
+            self.twitter_access_token = conf.get('twitter_access_token', None)
+            self.twitter_access_token_secret = conf.get('twitter_access_token_secret', None)
         self.irc = None
         self.lines = []
         self.unfinished_line = ''
@@ -62,6 +67,7 @@ class Bot:
         self.last_passive = None
         self.quotes = None
         self.mail = None
+        self.twitter = None
 
     def _send(self, msg):
         if not msg.endswith(self.crlf):
@@ -391,6 +397,11 @@ class Bot:
             else:
                 self._send_messages(source_nick, messages)
 
+        def tweet():
+            if reply_target not in [c.name for c in self.channels]:
+                self._send_message(reply_target, 'command only available in channel :(')
+            self._send_message(reply_target, 'sent :)' if self.twitter.tweet(raw_args) else 'not sent :(')
+
         def help():
             self._send_messages(source_nick, [
                 '!help: this message',
@@ -399,6 +410,7 @@ class Bot:
                 '!reddit: random reddit link',
                 '!porn: random porn link + longest comment',
                 '!wikihow: random wikihow article',
+                '!tweet MESSAGE: send MESSAGE as tweet',
                 '!quote [NICK] [YEAR] [?SEARCH]: get a random quote and optionally filter by nick, year or search string. Search string can be enclosed in quotes (?"") to allow spaces',
                 '!quotecount [NICK] [YEAR] [?SEARCH]: same as !quote, but get total number of matches instead',
                 '!quotetop [YEAR] [?SEARCH]: get the top 5 nicks by number of quotes',
@@ -430,6 +442,7 @@ class Bot:
             '!unsend': unsend_mail,
             '!outbox': outbox,
             '!seen': lambda: self._send_message(reply_target, self.mail.last_seen(args[0])) if len(args) > 0 else None,
+            '!tweet': tweet,
             # '!shell': shell_command,
             # '!up': lambda: self._send_multiline_message(reply_target, self.game.up()),
             # '!down': lambda: self._send_multiline_message(reply_target, self.game.down()),
@@ -447,9 +460,14 @@ class Bot:
 
     def _implicit_command(self, message, reply_target, source_nick):
         def youtube_lookup():
-            title = link_lookup.youtube_lookup(message)
+            title = link_lookup.youtube_lookup(message, self.youtube_api_key)
             if title is not None:
                 self._send_message(reply_target, '^^ \x02%s\x02' % title)  # 0x02 == control character for bold text
+
+        def twitter_lookup():
+            title = link_lookup.twitter_lookup(message, self.twitter)
+            if title is not None:
+                self._send_message(reply_target, '^^ \x02%s\x02' % title)
 
         def generic_lookup():
             title = link_lookup.generic_lookup(message)
@@ -465,7 +483,8 @@ class Bot:
         matched = False
         matchers = [
             ((lambda: link_lookup.contains_youtube(message)), youtube_lookup),
-            ((lambda: link_lookup.contains_link(message) and not matched), generic_lookup),  # skip if youtube link already matched
+            ((lambda: link_lookup.contains_twitter(message)), twitter_lookup),
+            ((lambda: link_lookup.contains_link(message) and not matched), generic_lookup),  # skip if specific link already matched
             ((lambda: unit_converter.contains_unit(message) and False), convert_units)
         ]
 
@@ -482,6 +501,7 @@ class Bot:
         self.nick_index = 0
         self.quotes = SqliteQuotes()
         self.mail = Mail()
+        self.twitter = Twitter(self.twitter_consumer_key, self.twitter_consumer_secret, self.twitter_access_token, self.twitter_access_token_secret)
 
         self._connect()
         while True:

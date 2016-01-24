@@ -7,7 +7,6 @@ from urllib.error import *
 
 
 timeout = 5
-youtube_api_key = None
 user_agents = [
     'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.106 Safari/537.36',
     'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.106 Safari/537.36',
@@ -28,7 +27,7 @@ def contains_youtube(message):
     return extract_youtube_id(message) is not None
 
 
-def youtube_lookup(message):
+def youtube_lookup(message, youtube_api_key):
     if youtube_api_key is None or len(youtube_api_key) == 0:
         return None
 
@@ -170,10 +169,35 @@ def xhamster_comment(link):
     return comments[0] if len(comments) > 0 else 'no comments :('
 
 
+def extract_twitter_id(message):
+    match = re.search(r'twitter.com/.+/status/(\d+)', message)
+
+    if match is not None and len(match.groups()) == 1:
+        return match.group(1)
+    return None
+
+
+def contains_twitter(message):
+    return extract_twitter_id(message) is not None
+
+
+def twitter_lookup(message, twitter):
+    tweet_id = extract_twitter_id(message)
+
+    if tweet_id is None or twitter is None:
+        return None
+
+    tweet = twitter.fetch(tweet_id)
+
+    if tweet is not None:
+        return '%s (@%s): %s' % (tweet.author.name, tweet.author.screen_name, tweet.text)
+    return None
+
+
 if __name__ == '__main__':
     with open('bot.conf') as f:
         youtube_api_key = json.load(f).get('youtube_api_key', None)
 
-    print(youtube_lookup('https://www.youtube.com/watch?v=g6QW-rFtKfA&feature=youtu.be&t=1529'))
+    print(youtube_lookup('https://www.youtube.com/watch?v=g6QW-rFtKfA&feature=youtu.be&t=1529', youtube_api_key))
     print(generic_lookup('hi here is a link for you https://twitter.com/qataraxia/status/672901207845961728'))
     #print(xhamster_comment('http://xhamster.com/movies/3949336/merry_christmas_and_happy_new_year.html'))
