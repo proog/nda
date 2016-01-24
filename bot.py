@@ -412,6 +412,9 @@ class Bot:
             if channel is None:
                 self._send_message(reply_target, 'command only available in channel :(')
                 return
+            if len(raw_args) > 140:
+                self._send_message(reply_target, 'tweet too long (%i characters) :(' % len(raw_args))
+                return
 
             if self.twitter.tweet(raw_args):
                 self._send_message(reply_target, 'sent :)')
