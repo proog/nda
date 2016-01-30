@@ -3,7 +3,7 @@ from datetime import datetime
 
 
 class Twitter:
-    tweet_rate = 600  # a tweet per 10 minutes
+    tweet_rate = 60  # a tweet per 1 minute
 
     def __init__(self, consumer_key, consumer_secret, access_token, access_token_secret):
         self.last_tweet = datetime.min
