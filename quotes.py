@@ -148,7 +148,7 @@ class SqliteQuotes:
                 '  SUM(CASE WHEN %s THEN 1 ELSE 0 END) AS matching, ' \
                 '  SUM(CASE WHEN %s THEN 1 ELSE 0 END) AS total ' \
                 '  FROM quotes GROUP BY author ' \
-                '  HAVING matching>0 AND total>0' \
+                '  HAVING matching>0 AND total>0 AND total>=100' \
                 ') ' \
                 'ORDER BY ratio DESC LIMIT %i' % (where, where_total, size)
 
