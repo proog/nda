@@ -350,13 +350,14 @@ class Bot:
             count = self.quotes.quote_count(reply_target, author, year, word)
             self._send_message(reply_target, '%i quotes' % count)
 
-        def quote_top():
+        def quote_top(percent=False):
             if channel is None:
                 self._send_message(reply_target, 'command only available in channel :(')
                 return
 
             author, year, word = parse_quote_command()
-            top = self.quotes.top(reply_target, 5, year, word)
+            func = self.quotes.top_percent if percent else self.quotes.top
+            top = func(reply_target, 5, year, word)
             if len(top) > 0:
                 self._send_messages(reply_target, top)
             else:
@@ -453,6 +454,7 @@ class Bot:
             '!quote': quote,
             '!quotecount': quote_count,
             '!quotetop': quote_top,
+            '!quotetopp': lambda: quote_top(True),
             '!update': update,
             '!isitmovienight': lambda: self._send_message(reply_target, 'maybe :)' if datetime.datetime.utcnow().weekday() in [4, 5] else 'no :('),
             '!rpg': rpg_action,

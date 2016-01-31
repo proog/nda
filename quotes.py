@@ -131,11 +131,30 @@ class SqliteQuotes:
 
     def top(self, channel, size=5, year=None, word=None):
         where, params = self._build_where(channel, None, year, word)
-        query = 'SELECT author, COUNT(*) AS c FROM quotes WHERE %s GROUP BY author ORDER BY c DESC LIMIT %i' % (where, size)
+        query = 'SELECT author, COUNT(*) AS c FROM quotes WHERE %s ' \
+                'GROUP BY author HAVING c>0 ORDER BY c DESC LIMIT %i' % (where, size)
 
         cursor = self.db.cursor()
         cursor.execute(query, params)
-        return ['%s: %i quotes' % (a, c) for a, c in cursor.fetchall() if c > 0]
+        return ['%s: %i quotes' % (a, c) for a, c in cursor.fetchall()]
+
+    def top_percent(self, channel, size=5, year=None, word=None):
+        where, params = self._build_where(channel, None, year, word)
+        where_total, params_total = self._build_where(channel)
+        query = 'SELECT author, matching, total, ' \
+                'CAST(matching AS REAL) / total * 100 AS ratio ' \
+                'FROM (' \
+                '  SELECT author, ' \
+                '  SUM(CASE WHEN %s THEN 1 ELSE 0 END) AS matching, ' \
+                '  SUM(CASE WHEN %s THEN 1 ELSE 0 END) AS total ' \
+                '  FROM quotes GROUP BY author ' \
+                '  HAVING matching>0 AND total>0' \
+                ') ' \
+                'ORDER BY ratio DESC LIMIT %i' % (where, where_total, size)
+
+        cursor = self.db.cursor()
+        cursor.execute(query, params + params_total)
+        return ['%s: %g%% (%i/%i)' % (a, r, c, t) for a, c, t, r in cursor.fetchall()]
 
     def import_irssi_log(self, filename, channel, utc_offset=0):
         utc_offset_padded = ('+' if utc_offset >= 0 else '') + str(utc_offset).zfill(2 if utc_offset >= 0 else 3) + '00'
@@ -508,7 +527,7 @@ class MongoQuotes:
 
 
 if __name__ == '__main__':
-    q = MongoQuotes()
+    q = SqliteQuotes()
     #for (nick, msg_count) in sorted(q.dump_irssi_log_authors('gclogs/#garachat-master.log').items(), key=lambda x: x[1], reverse=True):
     #    if nick not in q.aliases.keys():
     #        print('%s %i' % (nick, msg_count))
@@ -518,4 +537,5 @@ if __name__ == '__main__':
     print(q.random_quote(channel='#garachat', author='ashin', year=2010))
     print(q.quote_count(channel='#garachat', author='sarah'))
     print(q.random_quote(channel='#garachat', author='duo', word='fuck you guys'))
+    print(q.top_percent(channel='#garachat', year=None, word='cup'))
     q.close()
