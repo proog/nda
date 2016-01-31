@@ -37,6 +37,7 @@ class Bot:
     receive_timeout = 0.5
     ping_timeout = 180
     passive_interval = 60  # how long between performing passive, input independent operations like mail
+    admin_duration = 30
     crlf = '\r\n'
 
     def __init__(self, conf_file):
@@ -49,7 +50,7 @@ class Bot:
             self.real_name = conf['real_name']
             self.channels = [Channel(c) for c in conf['channels']]
             self.nickserv_password = conf.get('nickserv_password', None)
-            self.trusted_nicks = conf.get('trusted_nicks', [])
+            self.admin_password = conf.get('admin_password', '')
             self.quit_message = conf.get('quit_message', '')
             self.logging = conf.get('logging', False)
             self.youtube_api_key = conf.get('youtube_api_key', None)
@@ -61,6 +62,7 @@ class Bot:
         self.lines = []
         self.unfinished_line = ''
         self.nick_index = 0
+        self.admin_sessions = {}
         self.connect_time = None
         self.last_ping = None
         self.waiting_for_pong = False
@@ -74,6 +76,10 @@ class Bot:
             if name == channel.name:
                 return channel
         return None
+
+    def _is_admin(self, nick):
+        return nick in self.admin_sessions and \
+               (datetime.datetime.utcnow() - self.admin_sessions[nick]).total_seconds() < self.admin_duration
 
     def _send(self, msg):
         if not msg.endswith(self.crlf):
@@ -364,7 +370,7 @@ class Bot:
                 self._send_message(reply_target, 'no quotes found :(')
 
         def update():
-            if source_nick not in self.trusted_nicks:
+            if not self._is_admin(source_nick):
                 self._send_message(reply_target, 'how about no >:(')
                 return
 
@@ -376,7 +382,7 @@ class Bot:
                 self._send_message(reply_target, 'pull failed, manual update required :(')
 
         def shell_command():
-            if source_nick in self.trusted_nicks:
+            if self._is_admin(source_nick):
                 output = shell.run(' '.join(args))
                 self._send_messages(reply_target, output)
 
@@ -421,6 +427,13 @@ class Bot:
                 reason = 'in %i seconds' % delay if delay > 0 else 'now, but something went wrong'
                 self._send_message(reply_target, 'not sent (next tweet available %s) :(' % reason)
 
+        def su():
+            if raw_args == self.admin_password:
+                self.admin_sessions[source_nick] = datetime.datetime.utcnow()
+                self._send_message(source_nick, 'you are now authenticated for %i seconds' % self.admin_duration)
+            else:
+                self._send_message(source_nick, 'how about no >:(')
+
         def help():
             self._send_messages(source_nick, [
                 '!imgur: random imgur link',
@@ -461,6 +474,7 @@ class Bot:
             '!outbox': outbox,
             '!seen': lambda: self._send_message(reply_target, self.mail.last_seen(args[0])) if len(args) > 0 else None,
             '!tweet': tweet,
+            '!su': su,
             # '!shell': shell_command,
             # '!up': lambda: self._send_multiline_message(reply_target, self.game.up()),
             # '!down': lambda: self._send_multiline_message(reply_target, self.game.down()),
@@ -517,6 +531,7 @@ class Bot:
         self.lines = []
         self.unfinished_line = ''
         self.nick_index = 0
+        self.admin_sessions = {}
         self.quotes = SqliteQuotes()
         self.mail = Mail()
         self.twitter = Twitter(self.twitter_consumer_key, self.twitter_consumer_secret, self.twitter_access_token, self.twitter_access_token_secret)
