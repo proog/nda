@@ -434,6 +434,12 @@ class Bot:
             else:
                 self._send_message(source_nick, 'how about no >:(')
 
+        def die():
+            if self._is_admin(source_nick):
+                raise KeyboardInterrupt
+            else:
+                self._send_message(reply_target, 'how about no >:(')
+
         def help():
             self._send_messages(source_nick, [
                 '!imgur: random imgur link',
@@ -475,6 +481,7 @@ class Bot:
             '!seen': lambda: self._send_message(reply_target, self.mail.last_seen(args[0])) if len(args) > 0 else None,
             '!tweet': tweet,
             '!su': su,
+            '!die': die,
             # '!shell': shell_command,
             # '!up': lambda: self._send_multiline_message(reply_target, self.game.up()),
             # '!down': lambda: self._send_multiline_message(reply_target, self.game.down()),
