@@ -1,6 +1,7 @@
 import urllib.request
 import re
 import json
+import html
 import html.parser
 import random
 from urllib.error import *
@@ -190,7 +191,10 @@ def twitter_lookup(message, twitter):
     tweet = twitter.fetch(tweet_id)
 
     if tweet is not None:
-        return '%s (@%s): %s' % (tweet.author.name, tweet.author.screen_name, tweet.text)
+        handle = tweet.author.screen_name
+        author = html.unescape(tweet.author.name)
+        text = html.unescape(tweet.text)
+        return '%s (@%s): %s' % (author, handle, text)
     return None
 
 

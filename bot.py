@@ -90,7 +90,7 @@ class Bot:
         if msg is None or len(msg) == 0:
             return
 
-        msg = msg.strip(self.crlf)
+        msg = msg.replace(self.crlf, '\n').replace('\n', ' ').strip()
         self._log('Sending %s to %s' % (msg, to))
         command = 'PRIVMSG %s :' % to
 
