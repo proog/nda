@@ -101,7 +101,7 @@ class SqliteQuotes:
 
         return True  # return true if the quote was added
 
-    def random_quote(self, channel, author=None, year=None, word=None):
+    def random_quote(self, channel, author=None, year=None, word=None, add_author_info=True):
         num_rows = self.quote_count(channel, author, year, word)
 
         if num_rows == 0:
@@ -117,7 +117,7 @@ class SqliteQuotes:
         (timestamp, author, message) = cursor.fetchone()
         date = datetime.utcfromtimestamp(timestamp).strftime('%b %d %Y')
 
-        return '%s -- %s, %s' % (message, author, date)
+        return '%s -- %s, %s' % (message, author, date) if add_author_info else message
 
     def quote_count(self, channel, author=None, year=None, word=None):
         where, params = self._build_where(channel, author, year, word)
@@ -357,7 +357,7 @@ class MongoQuotes:
         self.mongo[self.db_name][self.collection_name].insert_one(document)
         return True  # return true if the quote was added
 
-    def random_quote(self, channel, author=None, year=None, word=None):
+    def random_quote(self, channel, author=None, year=None, word=None, add_author_info=True):
         num_rows = self.quote_count(channel, author, year, word)
 
         if num_rows == 0:
@@ -368,7 +368,7 @@ class MongoQuotes:
 
         for document in self.mongo[self.db_name][self.collection_name].find(query).limit(-1).skip(random_skip):
             date = datetime.utcfromtimestamp(document['time']).strftime('%b %d %Y')
-            return '%s -- %s, %s' % (document['message'], document['author'], date)
+            return '%s -- %s, %s' % (document['message'], document['author'], date) if add_author_info else document['message']
 
     def quote_count(self, channel, author=None, year=None, word=None):
         query = self._query(channel, author, year, word)

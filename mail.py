@@ -62,7 +62,7 @@ class Mail:
 
     def unread_receivers(self):
         cursor = self.db.cursor()
-        cursor.execute('SELECT DISTINCT to_nick FROM messages WHERE received == ?', (False,))
+        cursor.execute('SELECT DISTINCT to_nick FROM messages WHERE received=?', (False,))
         return [nick for (nick,) in cursor.fetchall()]
 
     def close(self):

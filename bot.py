@@ -12,7 +12,7 @@ import shell
 import re
 import traceback
 import greetings
-from idle_talk import IdleTalk
+from idle_talk import IdleTimer
 from quotes import SqliteQuotes
 from maze import Maze
 from rpg.main import RPG
@@ -27,7 +27,7 @@ class IRCError(Exception):
 class Channel:
     def __init__(self, name):
         self.name = name
-        self.idle_talk = IdleTalk()
+        self.idle_timer = IdleTimer()
         self.game = Maze()
         self.rpg = RPG(name)
 
@@ -53,6 +53,7 @@ class Bot:
             self.admin_password = conf.get('admin_password', '')
             self.quit_message = conf.get('quit_message', '')
             self.logging = conf.get('logging', False)
+            self.idle_talk = conf.get('idle_talk', False)
             self.youtube_api_key = conf.get('youtube_api_key', None)
             self.twitter_consumer_key = conf.get('twitter_consumer_key', None)
             self.twitter_consumer_secret = conf.get('twitter_consumer_secret', None)
@@ -200,15 +201,19 @@ class Bot:
             self.waiting_for_pong = True
             self.last_ping = datetime.datetime.utcnow()
 
-        # check if any nicks with unread messages have come online
-        unread_receivers = self.mail.unread_receivers()
-        if len(unread_receivers) > 0:
-            self._ison(unread_receivers)
+        # check if any nicks with unread messages have come online (disabled for now)
+        # unread_receivers = self.mail.unread_receivers()
+        # if len(unread_receivers) > 0:
+        #     self._ison(unread_receivers)
 
         # check if it's time to talk
-        for channel in self.channels:
-            if channel.idle_talk.can_talk() and False:
-                self._send_message(channel.name, channel.idle_talk.generate_message())
+        if self.idle_talk:
+            for channel in self.channels:
+                if channel.idle_timer.can_talk():
+                    channel.idle_timer.message_sent()  # notify idle timer that we sent something, even with no quote
+                    quote = self.quotes.random_quote(channel=channel.name, add_author_info=False)
+                    if quote is not None:
+                        self._send_message(channel.name, quote)
 
         # check if it's time for a festive greeting
         for channel_name, greeting in greetings.greet():
@@ -295,7 +300,7 @@ class Bot:
 
             channel = self._get_channel(reply_target)
             if channel is not None:
-                channel.idle_talk.add_message(message)  # add message to the idle talk log
+                channel.idle_timer.message_received()  # notify idle timer that someone talked
                 timestamp = int(datetime.datetime.utcnow().timestamp())
                 self.quotes.add_quote(channel.name, timestamp, source_nick, message)  # add message to the quotes database
 
@@ -452,9 +457,9 @@ class Bot:
                 '!quotetop [YEAR] [?SEARCH]: get the top 5 nicks by number of quotes',
                 '!quotetopp [YEAR] [?SEARCH]: same as !quotetop, but use matching:total ratio instead of number of quotes',
                 '!seen NICK: when did the bot last see NICK?',
-                '!send NICK MESSAGE: deliver MESSAGE to NICK once it\'s online',
-                '!outbox: see your messages that haven\'t been delivered yet',
-                '!unsend ID: cancel delivery of message with the specified id (listed by !outbox)',
+                # '!send NICK MESSAGE: deliver MESSAGE to NICK once it\'s online',
+                # '!outbox: see your messages that haven\'t been delivered yet',
+                # '!unsend ID: cancel delivery of message with the specified id (listed by !outbox)',
                 '!isitmovienight: is it movie night?',
                 '!rpg [ACTION]: play the GOTY right here'
             ])
@@ -475,13 +480,13 @@ class Bot:
             '!update': update,
             '!isitmovienight': lambda: self._send_message(reply_target, 'maybe :)' if datetime.datetime.utcnow().weekday() in [4, 5] else 'no :('),
             '!rpg': rpg_action,
-            '!send': send_mail,
-            '!unsend': unsend_mail,
-            '!outbox': outbox,
             '!seen': lambda: self._send_message(reply_target, self.mail.last_seen(args[0])) if len(args) > 0 else None,
             '!tweet': tweet,
             '!su': su,
             '!die': die,
+            # '!send': send_mail,
+            # '!unsend': unsend_mail,
+            # '!outbox': outbox,
             # '!shell': shell_command,
             # '!up': lambda: self._send_multiline_message(reply_target, self.game.up()),
             # '!down': lambda: self._send_multiline_message(reply_target, self.game.down()),

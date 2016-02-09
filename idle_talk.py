@@ -59,3 +59,35 @@ class IdleTalk:
                 self.log = file.readlines()
 
         self._trim_log()
+
+
+class IdleTimer:
+    min_idle_delay = 14400  # 4 hours
+    max_idle_delay = 18000  # 5 hours
+    min_message_interval = 5
+    max_message_interval = 14400  # 4 hours
+
+    def _random_delay(self):
+        return random.randint(self.min_idle_delay, self.max_idle_delay)
+
+    def _random_interval(self):
+        return random.randint(self.min_message_interval, self.max_message_interval)
+
+    def message_received(self):
+        self.last_receive = time.time()
+        self.delay = self._random_delay()  # set a random delay for each "quiet period"
+
+    def message_sent(self):
+        self.last_send = time.time()
+        self.interval = self._random_interval()  # set a random interval after each generated message
+
+    def can_talk(self):
+        t = time.time()
+        return self.last_receive + self.delay < t and self.last_send + self.interval < t
+
+    def __init__(self):
+        self.last_receive = 0
+        self.last_send = 0
+        self.delay = 0
+        self.interval = 0
+        self.message_received()
