@@ -280,6 +280,7 @@ class Bot:
                 self._parse_message(message, reply_target, source_nick)
 
     def _parse_message(self, message, reply_target, source_nick):
+        channel = self._get_channel(reply_target)
         tokens = message.split()
         _, _, raw_args = message.partition(' ')
 
@@ -294,13 +295,14 @@ class Bot:
         args = tokens[1:] if len(tokens) > 1 else []
         handled = self._explicit_command(command, args, reply_target, source_nick, raw_args)
 
+        if channel is not None:
+            channel.idle_timer.message_received()  # notify idle timer that someone talked
+
         if not handled:
             # implicit commands
             self._implicit_command(message, reply_target, source_nick)
 
-            channel = self._get_channel(reply_target)
             if channel is not None:
-                channel.idle_timer.message_received()  # notify idle timer that someone talked
                 timestamp = int(datetime.datetime.utcnow().timestamp())
                 self.quotes.add_quote(channel.name, timestamp, source_nick, message)  # add message to the quotes database
 
@@ -524,11 +526,15 @@ class Bot:
                 value, unit = converted
                 self._send_message(reply_target, '^^ %.2f %s' % (value, unit))
 
+        def auto_tweet():
+            self.twitter.tweet(message[:140] if len(message) > 140 else message)
+
         matched = False
         matchers = [
             ((lambda: link_lookup.contains_youtube(message)), youtube_lookup),
             ((lambda: link_lookup.contains_twitter(message)), twitter_lookup),
             ((lambda: link_lookup.contains_link(message) and not matched), generic_lookup),  # skip if specific link already matched
+            ((lambda: len([x for x in self.nicks if x.lower() in message.lower().split()]) > 0), auto_tweet),
             ((lambda: unit_converter.contains_unit(message) and False), convert_units)
         ]
 
