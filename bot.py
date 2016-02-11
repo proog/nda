@@ -529,12 +529,18 @@ class Bot:
         def auto_tweet():
             self.twitter.tweet(message[:140] if len(message) > 140 else message)
 
+        def tweet_trigger():
+            m = message.lower()
+            return 'i love' in m \
+                or 'i hate' in m \
+                or len([x for x in self.nicks if x.lower() in m.split()]) > 0
+
         matched = False
         matchers = [
             ((lambda: link_lookup.contains_youtube(message)), youtube_lookup),
             ((lambda: link_lookup.contains_twitter(message)), twitter_lookup),
             ((lambda: link_lookup.contains_link(message) and not matched), generic_lookup),  # skip if specific link already matched
-            ((lambda: len([x for x in self.nicks if x.lower() in message.lower().split()]) > 0), auto_tweet),
+            (tweet_trigger, auto_tweet),
             ((lambda: unit_converter.contains_unit(message) and False), convert_units)
         ]
 
