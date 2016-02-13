@@ -530,7 +530,7 @@ class Bot:
         def tweet_trigger():
             m = message.lower()
             return self.auto_tweet_regex is not None \
-                and len(m) in range(15, 141) \
+                and len(m) in range(20, 141) \
                 and re.search(self.auto_tweet_regex, m) is not None
 
         matched = False
