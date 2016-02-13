@@ -54,6 +54,7 @@ class Bot:
             self.quit_message = conf.get('quit_message', '')
             self.logging = conf.get('logging', False)
             self.idle_talk = conf.get('idle_talk', False)
+            self.auto_tweet_regex = conf.get('auto_tweet_regex', None)
             self.youtube_api_key = conf.get('youtube_api_key', None)
             self.twitter_consumer_key = conf.get('twitter_consumer_key', None)
             self.twitter_consumer_secret = conf.get('twitter_consumer_secret', None)
@@ -526,21 +527,18 @@ class Bot:
                 value, unit = converted
                 self._send_message(reply_target, '^^ %.2f %s' % (value, unit))
 
-        def auto_tweet():
-            self.twitter.tweet(message[:140] if len(message) > 140 else message)
-
         def tweet_trigger():
             m = message.lower()
-            return 'i love' in m \
-                or 'i hate' in m \
-                or len([x for x in self.nicks if x.lower() in m.split()]) > 0
+            return self.auto_tweet_regex is not None \
+                and len(m) in range(15, 141) \
+                and re.search(self.auto_tweet_regex, m) is not None
 
         matched = False
         matchers = [
             ((lambda: link_lookup.contains_youtube(message)), youtube_lookup),
             ((lambda: link_lookup.contains_twitter(message)), twitter_lookup),
             ((lambda: link_lookup.contains_link(message) and not matched), generic_lookup),  # skip if specific link already matched
-            (tweet_trigger, auto_tweet),
+            (tweet_trigger, lambda: self.twitter.tweet(message)),
             ((lambda: unit_converter.contains_unit(message) and False), convert_units)
         ]
 
