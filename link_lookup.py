@@ -1,10 +1,10 @@
-import urllib.request
 import re
 import json
 import html
 import html.parser
 import random
-from urllib.error import *
+import requests
+from requests.exceptions import *
 
 
 timeout = 5
@@ -38,12 +38,11 @@ def youtube_lookup(message, youtube_api_key):
         return None
 
     try:
-        response = urllib.request.urlopen(
+        response = requests.get(
             'https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=%s&key=%s' % (youtube_id, youtube_api_key),
             timeout=timeout
         )
-        data = response.read()
-        json_data = json.loads(data.decode('utf-8'))
+        json_data = response.json()
 
         if 'items' in json_data and len(json_data['items']) > 0:
             title = json_data['items'][0]['snippet']['title']
@@ -66,7 +65,7 @@ def youtube_lookup(message, youtube_api_key):
             return '%s [%s]' % (title, duration)
         else:
             return None
-    except (HTTPError, URLError):
+    except RequestException:
         return None
 
 
@@ -111,23 +110,22 @@ def generic_lookup(message):
         return None
 
     try:
-        request = urllib.request.Request(link, headers={
+        response = requests.get(link, timeout=timeout, headers={
             'Accept-Language': 'en-US',  # to avoid geo-specific response language from e.g. twitter
             'User-Agent': random.choice(user_agents)
         })
-        response = urllib.request.urlopen(request, timeout=timeout)
 
-        if response.status != 200 or 'text/html' not in response.getheader('Content-Type', '').lower():
+        if response.status_code != 200 or 'text/html' not in response.headers.get('Content-Type', '').lower():
             return None
 
         parser = Parser(convert_charrefs=True)
-        parser.feed(response.read().decode('utf-8'))
+        parser.feed(response.text)
         title = parser.title
 
         if title is not None and len(title.strip()) > 0:
             return title.strip()
         return None
-    except (HTTPError, URLError, UnicodeDecodeError):
+    except RequestException:
         return None
 
 
@@ -158,11 +156,10 @@ def xhamster_comment(link):
     parser = Parser(convert_charrefs=True)
 
     try:
-        request = urllib.request.Request(link, headers={
+        response = requests.get(link, timeout=timeout, headers={
             'User-Agent': random.choice(user_agents)
         })
-        response = urllib.request.urlopen(request, timeout=timeout)
-        parser.feed(response.read().decode('utf-8'))
+        parser.feed(response.text)
     except:
         return 'couldn\'t load comments :('
 
@@ -204,4 +201,5 @@ if __name__ == '__main__':
 
     print(youtube_lookup('https://www.youtube.com/watch?v=g6QW-rFtKfA&feature=youtu.be&t=1529', youtube_api_key))
     print(generic_lookup('hi here is a link for you https://twitter.com/qataraxia/status/672901207845961728'))
-    #print(xhamster_comment('http://xhamster.com/movies/3949336/merry_christmas_and_happy_new_year.html'))
+    print(xhamster_comment('http://xhamster.com/movies/3949336/merry_christmas_and_happy_new_year.html'))
+    print(generic_lookup('http://i.imgur.com/wtWCbcf.gifv'))
