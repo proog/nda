@@ -60,6 +60,8 @@ class Bot:
             self.twitter_consumer_secret = conf.get('twitter_consumer_secret', None)
             self.twitter_access_token = conf.get('twitter_access_token', None)
             self.twitter_access_token_secret = conf.get('twitter_access_token_secret', None)
+            self.reddit_consumer_key = conf.get('reddit_consumer_key', None)
+            self.reddit_consumer_secret = conf.get('reddit_consumer_secret', None)
         self.irc = None
         self.lines = []
         self.unfinished_line = ''
@@ -448,12 +450,17 @@ class Bot:
             else:
                 self._send_message(reply_target, 'how about no >:(')
 
+        def penis():
+            link = link_generator.penis_link(self.reddit_consumer_key, self.reddit_consumer_secret)
+            self._send_message(reply_target, link if link is not None else 'couldn\'t grab a dick for you, sorry :(')
+
         def help():
             self._send_messages(source_nick, [
                 '!imgur: random imgur link',
                 '!reddit: random reddit link',
                 '!porn: random porn link + longest comment',
                 '!wikihow: random wikihow article',
+                '!penis: random penis',
                 '!tweet MESSAGE: send MESSAGE as tweet',
                 '!quote [NICK] [YEAR] [?SEARCH]: get a random quote and optionally filter by nick, year or search string. Search string can be enclosed in quotes (?"") to allow spaces',
                 '!quotecount [NICK] [YEAR] [?SEARCH]: same as !quote, but get total number of matches instead',
@@ -474,6 +481,7 @@ class Bot:
             '!imgur': lambda: self._send_message(reply_target, link_generator.imgur_link()),
             '!reddit': lambda: self._send_message(reply_target, link_generator.reddit_link()),
             '!wikihow': lambda: self._send_message(reply_target, link_generator.wikihow_link()),
+            '!penis': penis,
             '!uptime': uptime,
             '!porn': porn,
             '!quote': quote,

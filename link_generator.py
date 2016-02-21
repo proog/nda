@@ -1,6 +1,9 @@
 import requests
+import requests.auth
 import random
+import json
 from requests.exceptions import *
+from datetime import datetime, timedelta
 
 
 timeout = 5
@@ -14,6 +17,8 @@ user_agents = [
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_2) AppleWebKit/601.3.9 (KHTML, like Gecko) Version/9.0.2 Safari/601.3.9',
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.106 Safari/537.36'
 ]
+reddit_access_token = None
+reddit_access_token_expiry = None
 
 
 def generate_combination(chars, length):
@@ -96,8 +101,56 @@ def wikihow_link():
     return 'couldn\'t find a valid link in %i tries :(' % max_tries
 
 
+def penis_link(consumer_key = None, consumer_secret = None):
+    global reddit_access_token, reddit_access_token_expiry
+    user_agent = 'nda_reddit:v0.1'
+    subreddit = random.choice(['massivecock', 'penis', 'softies', 'autofellatio', 'tinydick', 'selfservice'])
+    listing = random.choice(['new', 'hot', 'controversial'])
+    api_url = 'https://oauth.reddit.com/r/%s/%s?limit=20&raw_json=1' % (subreddit, listing)
+
+    if consumer_key is None or consumer_secret is None:
+        return None
+
+    if reddit_access_token is None or reddit_access_token_expiry >= datetime.utcnow():
+        auth = requests.auth.HTTPBasicAuth(consumer_key, consumer_secret)
+        response = requests.post('https://www.reddit.com/api/v1/access_token', auth=auth, data={
+            'grant_type': 'client_credentials',
+            'username': consumer_key,
+            'password': consumer_secret
+        }, headers={
+            'User-Agent': user_agent
+        })
+
+        response_json = response.json()
+        reddit_access_token = response_json.get('access_token', None)
+        reddit_access_token_expiry = datetime.utcnow() + timedelta(seconds=response_json.get('expires_in', 0))
+
+        if reddit_access_token is None:
+            return None
+
+    response = requests.get(api_url, headers={
+        'Authorization': 'bearer %s' % reddit_access_token,
+        'User-Agent': user_agent
+    })
+    posts = response.json().get('data', {}).get('children', [])
+
+    if len(posts) == 0:
+        return None
+
+    post = random.choice(posts)['data']
+    url = post['url']
+    title = post['title']
+
+    return '%s -- %s' % (url, title)
+
 if __name__ == '__main__':
     print('found: ' + imgur_link())
     print('found: ' + reddit_link())
     print('found: ' + xhamster_link())
     print('found: ' + wikihow_link())
+
+    with open('bot.conf', 'r') as f:
+        conf = json.load(f)
+        consumer_key = conf.get('reddit_consumer_key', None)
+        consumer_secret = conf.get('reddit_consumer_secret', None)
+        print(penis_link(consumer_key, consumer_secret))
