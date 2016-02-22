@@ -111,7 +111,7 @@ def penis_link(consumer_key = None, consumer_secret = None):
     if consumer_key is None or consumer_secret is None:
         return None
 
-    if reddit_access_token is None or reddit_access_token_expiry >= datetime.utcnow():
+    if reddit_access_token is None or datetime.utcnow() >= reddit_access_token_expiry:
         auth = requests.auth.HTTPBasicAuth(consumer_key, consumer_secret)
         response = requests.post('https://www.reddit.com/api/v1/access_token', auth=auth, data={
             'grant_type': 'client_credentials',
@@ -153,4 +153,5 @@ if __name__ == '__main__':
         conf = json.load(f)
         consumer_key = conf.get('reddit_consumer_key', None)
         consumer_secret = conf.get('reddit_consumer_secret', None)
+        print(penis_link(consumer_key, consumer_secret))
         print(penis_link(consumer_key, consumer_secret))
