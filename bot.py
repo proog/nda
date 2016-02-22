@@ -154,7 +154,7 @@ class Bot:
             return None
 
         buffer = self.irc.recv(self.buffer_size)
-        data = self.unfinished_line + buffer.decode('utf-8')  # prepend unfinished line to its continuation
+        data = self.unfinished_line + buffer.decode('utf-8', errors='ignore')  # prepend unfinished line to its continuation
         lines = data.split(self.crlf)
 
         # if buffer ended on newline, the last element will be empty string
