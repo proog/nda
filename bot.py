@@ -549,6 +549,7 @@ class Bot:
             if count > 0:
                 msg, = db.execute('SELECT message FROM undertale WHERE id=?', (random.randint(1, count),)).fetchone()
                 self._send_message(reply_target, msg)
+            db.close()
 
         matched = False
         matchers = [
