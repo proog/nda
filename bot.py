@@ -12,6 +12,8 @@ import shell
 import re
 import traceback
 import greetings
+import sqlite3
+import random
 from idle_talk import IdleTimer
 from quotes import SqliteQuotes
 from maze import Maze
@@ -541,11 +543,19 @@ class Bot:
                 and len(m) in range(40, 141) \
                 and re.search(self.auto_tweet_regex, m) is not None
 
+        def undertale():
+            db = sqlite3.connect('undertale.db')
+            count, = db.execute('SELECT COUNT(*) FROM undertale').fetchone()
+            if count > 0:
+                msg, = db.execute('SELECT message FROM undertale WHERE id=?', (random.randint(1, count),)).fetchone()
+                self._send_message(reply_target, msg)
+
         matched = False
         matchers = [
             ((lambda: link_lookup.contains_youtube(message)), youtube_lookup),
             ((lambda: link_lookup.contains_twitter(message)), twitter_lookup),
             ((lambda: link_lookup.contains_link(message) and not matched), generic_lookup),  # skip if specific link already matched
+            ((lambda: 'undertale' in message.lower()), undertale),
             (tweet_trigger, lambda: self.twitter.tweet(message)),
             ((lambda: unit_converter.contains_unit(message) and False), convert_units)
         ]
