@@ -477,6 +477,8 @@ class Bot:
                 '!wikihow: random wikihow article',
                 '!penis: random penis',
                 '!tweet MESSAGE: send MESSAGE as tweet',
+                '!settime UTC_OFFSET: set your timezone',
+                '!time NICK: get current time and timezone for NICK',
                 '!quote [NICK] [YEAR] [?SEARCH]: get a random quote and optionally filter by nick, year or search string. Search string can be enclosed in quotes (?"") to allow spaces',
                 '!quotecount [NICK] [YEAR] [?SEARCH]: same as !quote, but get total number of matches instead',
                 '!quotetop [YEAR] [?SEARCH]: get the top 5 nicks by number of quotes',
