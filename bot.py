@@ -64,6 +64,7 @@ class Bot:
             self.twitter_access_token_secret = conf.get('twitter_access_token_secret', None)
             self.reddit_consumer_key = conf.get('reddit_consumer_key', None)
             self.reddit_consumer_secret = conf.get('reddit_consumer_secret', None)
+            self.aliases = conf.get('aliases', {})
         self.irc = None
         self.lines = []
         self.unfinished_line = ''
@@ -456,6 +457,18 @@ class Bot:
             link = link_generator.penis_link(self.reddit_consumer_key, self.reddit_consumer_secret)
             self._send_message(reply_target, link if link is not None else 'couldn\'t grab a dick for you, sorry :(')
 
+        def set_time():
+            if len(args) > 0:
+                self._send_message(reply_target, self.quotes.set_time(source_nick, args[0]))
+            else:
+                self._send_message(reply_target, 'missing utc offset :(')
+
+        def get_time():
+            if len(args) > 0:
+                self._send_message(reply_target, self.quotes.get_time(args[0]))
+            else:
+                self._send_message(reply_target, 'missing nick :(')
+
         def help():
             self._send_messages(source_nick, [
                 '!imgur: random imgur link',
@@ -490,6 +503,8 @@ class Bot:
             '!quotecount': quote_count,
             '!quotetop': quote_top,
             '!quotetopp': lambda: quote_top(True),
+            '!settime': set_time,
+            '!time': get_time,
             '!update': update,
             '!isitmovienight': lambda: self._send_message(reply_target, 'maybe :)' if datetime.datetime.utcnow().weekday() in [4, 5] else 'no :('),
             '!rpg': rpg_action,
@@ -573,7 +588,7 @@ class Bot:
         self.unfinished_line = ''
         self.nick_index = 0
         self.admin_sessions = {}
-        self.quotes = SqliteQuotes()
+        self.quotes = SqliteQuotes(self.aliases)
         self.mail = Mail()
         self.twitter = Twitter(self.twitter_consumer_key, self.twitter_consumer_secret, self.twitter_access_token, self.twitter_access_token_secret)
 

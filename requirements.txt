@@ -1,3 +1,2 @@
-pymongo
 tweepy
 requests
