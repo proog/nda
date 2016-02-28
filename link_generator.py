@@ -104,7 +104,7 @@ def wikihow_link():
 def penis_link(consumer_key = None, consumer_secret = None):
     global reddit_access_token, reddit_access_token_expiry
     user_agent = 'nda_reddit:v0.1'
-    subreddit = random.choice(['massivecock', 'penis', 'softies', 'autofellatio', 'tinydick', 'selfservice', 'guysgonewild'])
+    subreddit = random.choice(['massivecock', 'penis', 'softies', 'autofellatio', 'tinydick', 'selfservice', 'guysgonewild', 'totallystraight'])
     listing = random.choice(['new', 'hot', 'controversial'])
     api_url = 'https://oauth.reddit.com/r/%s/%s?limit=20&raw_json=1' % (subreddit, listing)
 
