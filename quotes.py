@@ -178,7 +178,7 @@ class SqliteQuotes:
         row = cursor.fetchone()
 
         if row is None:
-            return 'no timezone found for %s' % author
+            return 'no timezone found for %s :(' % author
 
         offset, = row
         utc_offset_str = '+%i' % offset if offset >= 0 else str(offset)
