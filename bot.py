@@ -169,6 +169,11 @@ class Bot:
         return self._readline()  # recurse until a finished line is found or nothing is received within timeout
 
     def _connect(self):
+        self.lines = []
+        self.unfinished_line = ''
+        self.nick_index = 0
+        self.admin_sessions = {}
+
         self._log('Connecting to %s:%s' % (self.address, self.port))
         self.irc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.irc.connect((self.address, self.port))
@@ -586,35 +591,35 @@ class Bot:
         return matched
 
     def _main_loop(self):
-        self.lines = []
-        self.unfinished_line = ''
-        self.nick_index = 0
-        self.admin_sessions = {}
-        self.quotes = SqliteQuotes(self.aliases)
-        self.mail = Mail()
-        self.twitter = Twitter(self.twitter_consumer_key, self.twitter_consumer_secret, self.twitter_access_token, self.twitter_access_token_secret)
-
-        self._connect()
         while True:
-            self._receive()
-
-    def start(self):
-        while True:  # keep trying to run the main loop even after errors occur
             try:
-                self._main_loop()
+                self._receive()
             except IRCError as irc_error:
                 self._log('IRC error: %s' % irc_error.args)
                 self._disconnect()
                 time.sleep(5)
+                self._connect()
             except OSError as os_error:
                 self._log('OS error (errno %i): %s' % (os_error.errno, os_error.strerror))
+                self._disconnect()
                 time.sleep(5)
+                self._connect()
             except KeyboardInterrupt:
                 self._disconnect()
                 break
             except Exception as error:
                 self._log('Unknown error (%s): %s' % (str(type(error)), error.args))
                 self._log(traceback.format_exc())
+                for channel in self.channels:
+                    self._send_message(channel.name, 'tell proog that a %s occurred :\'(' % str(type(error)))
+
+    def start(self):
+        self.quotes = SqliteQuotes(self.aliases)
+        self.mail = Mail()
+        self.twitter = Twitter(self.twitter_consumer_key, self.twitter_consumer_secret, self.twitter_access_token, self.twitter_access_token_secret)
+
+        self._connect()
+        self._main_loop()
 
 
 if __name__ == '__main__':

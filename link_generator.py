@@ -101,45 +101,58 @@ def wikihow_link():
     return 'couldn\'t find a valid link in %i tries :(' % max_tries
 
 
-def penis_link(consumer_key = None, consumer_secret = None):
+def get_reddit_access_token(consumer_key, consumer_secret, user_agent):
     global reddit_access_token, reddit_access_token_expiry
-    user_agent = 'nda_reddit:v0.1'
-    subreddit = random.choice(['massivecock', 'penis', 'softies', 'autofellatio', 'tinydick', 'selfservice', 'guysgonewild', 'totallystraight'])
-    listing = random.choice(['new', 'hot', 'controversial'])
-    api_url = 'https://oauth.reddit.com/r/%s/%s?limit=20&raw_json=1' % (subreddit, listing)
 
     if consumer_key is None or consumer_secret is None:
         return None
 
     if reddit_access_token is None or datetime.utcnow() >= reddit_access_token_expiry:
         auth = requests.auth.HTTPBasicAuth(consumer_key, consumer_secret)
-        response = requests.post('https://www.reddit.com/api/v1/access_token', auth=auth, data={
-            'grant_type': 'client_credentials',
-            'username': consumer_key,
-            'password': consumer_secret
-        }, headers={
-            'User-Agent': user_agent
-        })
 
-        response_json = response.json()
-        reddit_access_token = response_json.get('access_token', None)
-        reddit_access_token_expiry = datetime.utcnow() + timedelta(seconds=response_json.get('expires_in', 0))
+        try:
+            response = requests.post('https://www.reddit.com/api/v1/access_token', auth=auth, data={
+                'grant_type': 'client_credentials',
+                'username': consumer_key,
+                'password': consumer_secret
+            }, headers={
+                'User-Agent': user_agent
+            })
 
-        if reddit_access_token is None:
+            response_json = response.json()
+            reddit_access_token = response_json.get('access_token', None)
+            reddit_access_token_expiry = datetime.utcnow() + timedelta(seconds=response_json.get('expires_in', 0))
+        except:
             return None
 
-    response = requests.get(api_url, headers={
-        'Authorization': 'bearer %s' % reddit_access_token,
-        'User-Agent': user_agent
-    })
-    posts = response.json().get('data', {}).get('children', [])
+    return reddit_access_token
 
-    if len(posts) == 0:
+
+def penis_link(consumer_key, consumer_secret):
+    user_agent = 'nda_reddit:v0.1'
+    subreddit = random.choice(['massivecock', 'penis', 'softies', 'autofellatio', 'tinydick', 'selfservice', 'guysgonewild', 'totallystraight'])
+    listing = random.choice(['new', 'hot', 'controversial'])
+    api_url = 'https://oauth.reddit.com/r/%s/%s?limit=20&raw_json=1' % (subreddit, listing)
+    access_token = get_reddit_access_token(consumer_key, consumer_secret, user_agent)
+
+    if access_token is None:
         return None
 
-    post = random.choice(posts)['data']
-    url = post['url']
-    title = post['title']
+    try:
+        response = requests.get(api_url, headers={
+            'Authorization': 'bearer %s' % access_token,
+            'User-Agent': user_agent
+        })
+        posts = response.json().get('data', {}).get('children', [])
+
+        if len(posts) == 0:
+            return None
+
+        post = random.choice(posts)['data']
+        url = post['url']
+        title = post['title']
+    except:
+        return None
 
     return '%s -- %s' % (url, title)
 
