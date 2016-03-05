@@ -134,7 +134,7 @@ class Database:
         (timestamp, author, message, seq_id) = cursor.fetchone()
         date = datetime.utcfromtimestamp(timestamp).strftime('%b %d %Y')
 
-        return '%s -- %s, %s (s%i)' % (message, author, date, seq_id) if add_author_info else message
+        return '%s -- %s, %s (%i)' % (message, author, date, seq_id) if add_author_info else message
 
     def quote_count(self, channel, author=None, year=None, word=None):
         where, params = self._build_quote_where(channel, author, year, word)
