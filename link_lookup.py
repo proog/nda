@@ -196,7 +196,7 @@ def twitter_lookup(message, twitter):
 
 
 if __name__ == '__main__':
-    with open('bot.conf') as f:
+    with open('nda.conf') as f:
         youtube_api_key = json.load(f).get('youtube_api_key', None)
 
     print(youtube_lookup('https://www.youtube.com/watch?v=g6QW-rFtKfA&feature=youtu.be&t=1529', youtube_api_key))

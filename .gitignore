@@ -1,9 +1,7 @@
-quotes.db
-mail.db
-bot.conf
-quotes.conf
-rpg/save-*.json
+nda.db
+nda.conf
 greetings.conf
+rpg/save-*.json
 
 # Created by https://www.gitignore.io/api/python,intellij
 

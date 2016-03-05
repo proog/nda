@@ -1,44 +1,33 @@
 import sqlite3
 import re
-import json
 import random
 from datetime import datetime, timezone, timedelta
-from util import normalize_nick, year_to_timestamps
+from util import normalize_nick, year_to_timestamps, escape_sql_like
 
 
-class SqliteQuotes:
-    def __init__(self, aliases=None, conf_file='quotes.conf'):
-        self.db_name = 'quotes.db'
-        self.eager_word_count = True
+class Database:
+    def __init__(self, db_name, aliases=None, ignore_nicks=None):
         self.aliases = aliases if aliases is not None else {}
+        self.ignore_nicks = ignore_nicks if ignore_nicks is not None else []
 
-        with open(conf_file, 'r', encoding='utf-8') as file:
-            conf = json.load(file)
-            self.ignore_nicks = conf.get('ignore', [])
-
-        self.db = sqlite3.connect(self.db_name)
+        self.db = sqlite3.connect(db_name)
         self.db.execute('CREATE TABLE IF NOT EXISTS quotes (id INTEGER PRIMARY KEY AUTOINCREMENT, channel TEXT, time INTEGER, author TEXT, message TEXT, word_count INTEGER)')
         self.db.execute('CREATE INDEX IF NOT EXISTS idx_channel ON quotes (channel)')
         self.db.execute('CREATE INDEX IF NOT EXISTS idx_time ON quotes (time)')
         self.db.execute('CREATE INDEX IF NOT EXISTS idx_author ON quotes (author)')
         self.db.execute('CREATE INDEX IF NOT EXISTS idx_message ON quotes (message)')
         self.db.execute('CREATE INDEX IF NOT EXISTS idx_word_count ON quotes (word_count)')
-        self.db.execute('CREATE TABLE IF NOT EXISTS timezones (id INTEGER PRIMARY KEY AUTOINCREMENT, author TEXT, utc_offset INTEGER)')
-        self.db.execute('CREATE INDEX IF NOT EXISTS idx_author ON timezones (author)')
+
+        self.db.execute('CREATE TABLE IF NOT EXISTS nicks (id INTEGER PRIMARY KEY AUTOINCREMENT, nick TEXT UNIQUE, last_seen INTEGER, utc_offset INTEGER)')
+
+        self.db.execute('CREATE TABLE IF NOT EXISTS mail (id INTEGER PRIMARY KEY AUTOINCREMENT, from_nick TEXT, to_nick TEXT, message TEXT, received INTEGER, sent_at INTEGER, received_at INTEGER)')
+        self.db.execute('CREATE INDEX IF NOT EXISTS idx_to_nick ON mail (to_nick)')
+        self.db.execute('CREATE INDEX IF NOT EXISTS idx_received ON mail (received)')
         self.db.commit()
 
-    def _escape_like(self, word):
-        for char in ['\\', '%', '_']:
-            word = word.replace(char, '\\' + char)
-        return word
-
-    def _build_where(self, channel, author=None, year=None, word=None):
+    def _build_quote_where(self, channel, author=None, year=None, word=None):
         query = 'channel=?'
         params = (channel,)
-
-        if not self.eager_word_count:
-            query += ' AND word_count>=?'
-            params += (5,)
 
         if year is not None:
             time_tuple = year_to_timestamps(year)
@@ -53,7 +42,7 @@ class SqliteQuotes:
             params += (author,)
 
         if word is not None:
-            word = self._escape_like(word.lower())
+            word = escape_sql_like(word.lower())
             query += ' AND message LIKE ? ESCAPE ?'
             params += ('%' + word + '%', '\\')
 
@@ -69,7 +58,7 @@ class SqliteQuotes:
         message = message.rstrip()  # remove trailing whitespace from message
         word_count = len(message.split())
 
-        if timestamp == 0 or len(author) == 0 or (self.eager_word_count and word_count < 5) or author in self.ignore_nicks:
+        if timestamp == 0 or len(author) == 0 or word_count < 5 or author in self.ignore_nicks:
             return False
 
         cursor = self.db.cursor()
@@ -88,7 +77,7 @@ class SqliteQuotes:
             return None
 
         random_skip = random.randint(0, num_rows - 1)
-        where, params = self._build_where(channel, author, year, word)
+        where, params = self._build_quote_where(channel, author, year, word)
         query = 'SELECT time, author, message FROM quotes WHERE %s LIMIT 1 OFFSET %i' % (where, random_skip)
 
         cursor = self.db.cursor()
@@ -100,7 +89,7 @@ class SqliteQuotes:
         return '%s -- %s, %s' % (message, author, date) if add_author_info else message
 
     def quote_count(self, channel, author=None, year=None, word=None):
-        where, params = self._build_where(channel, author, year, word)
+        where, params = self._build_quote_where(channel, author, year, word)
         query = 'SELECT COUNT(*) FROM quotes WHERE %s' % where
 
         cursor = self.db.cursor()
@@ -109,8 +98,8 @@ class SqliteQuotes:
 
         return int(count)
 
-    def top(self, channel, size=5, year=None, word=None):
-        where, params = self._build_where(channel, None, year, word)
+    def quote_top(self, channel, size=5, year=None, word=None):
+        where, params = self._build_quote_where(channel, None, year, word)
         query = 'SELECT author, COUNT(*) AS c FROM quotes WHERE %s ' \
                 'GROUP BY author HAVING c>0 ORDER BY c DESC LIMIT %i' % (where, size)
 
@@ -118,9 +107,9 @@ class SqliteQuotes:
         cursor.execute(query, params)
         return ['%s: %i quotes' % (a, c) for a, c in cursor.fetchall()]
 
-    def top_percent(self, channel, size=5, year=None, word=None):
-        where, params = self._build_where(channel, None, year, word)
-        where_total, params_total = self._build_where(channel)
+    def quote_top_percent(self, channel, size=5, year=None, word=None):
+        where, params = self._build_quote_where(channel, None, year, word)
+        where_total, params_total = self._build_quote_where(channel)
         query = 'SELECT author, matching, total, ' \
                 'CAST(matching AS REAL) / total * 100 AS ratio ' \
                 'FROM (' \
@@ -136,34 +125,92 @@ class SqliteQuotes:
         cursor.execute(query, params + params_total)
         return ['%s: %g%% (%i/%i)' % (a, r, c, t) for a, c, t, r in cursor.fetchall()]
 
-    def set_time(self, author, utc_offset):
+    def set_current_time(self, nick, utc_offset):
         try:
             utc_offset = min(max(int(utc_offset), -12), 12)
         except:
             return 'wrong format :('
 
-        author = normalize_nick(author, self.aliases)
+        nick = normalize_nick(nick, self.aliases)
         cursor = self.db.cursor()
-        cursor.execute('DELETE FROM timezones WHERE author=?', (author,))
-        cursor.execute('INSERT INTO timezones (author, utc_offset) VALUES (?, ?)', (author, utc_offset))
+        cursor.execute('INSERT OR IGNORE INTO nicks (nick) VALUES (?)', (nick,))
+        cursor.execute('UPDATE nicks SET utc_offset=? WHERE nick=?', (utc_offset, nick))
         self.db.commit()
 
         return 'ok :)'
 
-    def get_time(self, author):
-        normalized_author = normalize_nick(author, self.aliases)
+    def current_time(self, nick):
+        normalized_nick = normalize_nick(nick, self.aliases)
         cursor = self.db.cursor()
-        cursor.execute('SELECT utc_offset FROM timezones WHERE author=?', (normalized_author,))
+        cursor.execute('SELECT utc_offset FROM nicks WHERE nick=?', (normalized_nick,))
         row = cursor.fetchone()
 
-        if row is None:
-            return 'no timezone found for %s :(' % author
+        if row is None or row[0] is None:
+            return 'no timezone found for %s :(' % nick
 
-        offset, = row
+        offset = row[0]
         utc_offset_str = '+%i' % offset if offset >= 0 else str(offset)
         tz = timezone(timedelta(hours=offset))
 
-        return 'it\'s %s for %s (utc%s)' % (datetime.now(tz).strftime('%I:%M %p'), author, utc_offset_str)
+        return 'it\'s %s for %s (utc%s)' % (datetime.now(tz).strftime('%I:%M %p'), nick, utc_offset_str)
+
+    def update_last_seen(self, nick, timestamp=None):
+        nick = normalize_nick(nick, self.aliases)
+        timestamp = timestamp if timestamp is not None else int(datetime.utcnow().timestamp())
+        cursor = self.db.cursor()
+        cursor.execute('INSERT OR IGNORE INTO nicks (nick) VALUES (?)', (nick,))
+        cursor.execute('UPDATE nicks SET last_seen=? WHERE nick=?', (timestamp, nick))
+        self.db.commit()
+
+    def last_seen(self, nick):
+        alias = normalize_nick(nick, self.aliases)
+        cursor = self.db.cursor()
+        cursor.execute('SELECT last_seen FROM nicks WHERE nick=?', (alias,))
+        row = cursor.fetchone()
+
+        if row is None or row[0] is None:
+            return '%s has never been seen :(' % nick
+
+        return '%s was last seen on %s :)' % (nick, datetime.utcfromtimestamp(row[0]).strftime('%Y-%m-%d %H:%M:%S'))
+
+    def mail_send(self, from_, to, message):
+        from_ = normalize_nick(from_, self.aliases)
+        to = normalize_nick(to, self.aliases)
+        cursor = self.db.cursor()
+        cursor.execute('INSERT INTO mail (from_nick, to_nick, message, received, sent_at, received_at) VALUES (?, ?, ?, ?, ?, ?)',
+                       (from_, to, message, False, int(datetime.utcnow().timestamp()), None))
+        self.db.commit()
+
+    def mail_unsend(self, from_, id):
+        cursor = self.db.cursor()
+        cursor.execute('DELETE FROM mail WHERE from_nick=? AND id=?', (from_, id))
+        self.db.commit()
+        return cursor.rowcount > 0
+
+    def mail_outbox(self, from_):
+        from_ = normalize_nick(from_, self.aliases)
+        cursor = self.db.cursor()
+        cursor.execute('SELECT id, to_nick, message FROM mail WHERE from_nick=? AND received=? ORDER BY id', (from_, False))
+        return ['%i: (%s) %s' % (id, to, msg) for id, to, msg in cursor.fetchall()]
+
+    def mail_unread_messages(self, to):
+        to = normalize_nick(to, self.aliases)
+        cursor = self.db.cursor()
+        cursor.execute('SELECT from_nick, message, sent_at FROM mail WHERE to_nick=? AND received=? ORDER BY sent_at ASC', (to, False))
+
+        messages = ['%s -- %s, %s' % (msg, from_, datetime.utcfromtimestamp(sent).strftime('%Y-%m-%d %H:%M:%S'))
+                    for from_, msg, sent in cursor.fetchall()]
+
+        now = int(datetime.utcnow().timestamp())
+        cursor.execute('UPDATE mail SET received=?, received_at=? WHERE to_nick=? AND received=?', (True, now, to, False))
+        self.db.commit()
+
+        return messages
+
+    def mail_unread_receivers(self):
+        cursor = self.db.cursor()
+        cursor.execute('SELECT DISTINCT to_nick FROM mail WHERE received=?', (False,))
+        return [nick for (nick,) in cursor.fetchall()]
 
     def import_irssi_log(self, filename, channel, utc_offset=0):
         utc_offset_padded = ('+' if utc_offset >= 0 else '') + str(utc_offset).zfill(2 if utc_offset >= 0 else 3) + '00'
@@ -282,15 +329,15 @@ class SqliteQuotes:
 
 
 if __name__ == '__main__':
-    q = SqliteQuotes()
+    q = Database('nda.db')
     #for (nick, msg_count) in sorted(q.dump_irssi_log_authors('gclogs/#garachat-master.log').items(), key=lambda x: x[1], reverse=True):
     #    if nick not in q.aliases.keys():
     #        print('%s %i' % (nick, msg_count))
     #q.add_quote('#garachat', 0, 'ashin', '( ͡° ͜ʖ ͡°)')
     #q.import_irssi_log('gclogs/#garachat-master.log', '#garachat', 0)
-    print(q.top(channel='#garachat', size=5))
+    print(q.quote_top(channel='#garachat', size=5))
     print(q.random_quote(channel='#garachat', author='ashin', year=2010))
     print(q.quote_count(channel='#garachat', author='sarah'))
     print(q.random_quote(channel='#garachat', author='duo', word='fuck you guys'))
-    print(q.top_percent(channel='#garachat', year=None, word='cup'))
+    print(q.quote_top_percent(channel='#garachat', year=None, word='cup'))
     q.close()

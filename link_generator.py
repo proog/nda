@@ -107,7 +107,8 @@ def get_reddit_access_token(consumer_key, consumer_secret, user_agent):
     if consumer_key is None or consumer_secret is None:
         return None
 
-    if reddit_access_token is None or datetime.utcnow() >= reddit_access_token_expiry:
+    # the request itself may take time so we refresh the token 10 seconds earlier than needed
+    if reddit_access_token is None or datetime.utcnow() >= reddit_access_token_expiry - timedelta(seconds=10):
         auth = requests.auth.HTTPBasicAuth(consumer_key, consumer_secret)
 
         try:
@@ -162,7 +163,7 @@ if __name__ == '__main__':
     print('found: ' + xhamster_link())
     print('found: ' + wikihow_link())
 
-    with open('bot.conf', 'r') as f:
+    with open('nda.conf', 'r') as f:
         conf = json.load(f)
         consumer_key = conf.get('reddit_consumer_key', None)
         consumer_secret = conf.get('reddit_consumer_secret', None)

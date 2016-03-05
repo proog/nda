@@ -15,10 +15,9 @@ import greetings
 import sqlite3
 import random
 from idle_talk import IdleTimer
-from quotes import SqliteQuotes
+from database import Database
 from maze import Maze
 from rpg.main import RPG
-from mail import Mail
 from twitter import Twitter
 
 
@@ -34,7 +33,7 @@ class Channel:
         self.rpg = RPG(name)
 
 
-class Bot:
+class NDA:
     buffer_size = 4096
     receive_timeout = 0.5
     ping_timeout = 180
@@ -65,6 +64,7 @@ class Bot:
             self.reddit_consumer_key = conf.get('reddit_consumer_key', None)
             self.reddit_consumer_secret = conf.get('reddit_consumer_secret', None)
             self.aliases = conf.get('aliases', {})
+            self.ignore_nicks = conf.get('ignore_nicks', [])
         self.irc = None
         self.lines = []
         self.unfinished_line = ''
@@ -74,8 +74,7 @@ class Bot:
         self.last_ping = None
         self.waiting_for_pong = False
         self.last_passive = None
-        self.quotes = None
-        self.mail = None
+        self.database = None
         self.twitter = None
 
     def _get_channel(self, name):
@@ -134,7 +133,7 @@ class Bot:
         self._send('ISON %s' % nicks_str)
 
     def _process_mail(self, to):
-        messages = self.mail.unread_messages(to)
+        messages = self.database.mail_unread_messages(to)
         if len(messages) > 0:
             self._send_message(to, 'you have %i unread message(s)' % len(messages))
             self._send_messages(to, messages)
@@ -144,7 +143,7 @@ class Bot:
         print(msg)
 
         if self.logging:
-            with open('bot.log', 'a', encoding='utf-8') as f:
+            with open('nda.log', 'a', encoding='utf-8') as f:
                 f.write('%s%s' % (msg, self.crlf))
 
     def _readline(self):
@@ -186,8 +185,7 @@ class Bot:
 
     def _disconnect(self):
         self._log('Disconnecting from %s:%s' % (self.address, self.port))
-        self.quotes.close()
-        self.mail.close()
+        self.database.close()
 
         try:
             self._send('QUIT :%s' % self.quit_message)
@@ -213,7 +211,7 @@ class Bot:
             self.last_ping = datetime.datetime.utcnow()
 
         # check if any nicks with unread messages have come online (disabled for now)
-        # unread_receivers = self.mail.unread_receivers()
+        # unread_receivers = self.database.mail_unread_receivers()
         # if len(unread_receivers) > 0:
         #     self._ison(unread_receivers)
 
@@ -222,7 +220,7 @@ class Bot:
             for channel in self.channels:
                 if channel.idle_timer.can_talk():
                     channel.idle_timer.message_sent()  # notify idle timer that we sent something, even with no quote
-                    quote = self.quotes.random_quote(channel=channel.name, add_author_info=False)
+                    quote = self.database.random_quote(channel=channel.name, add_author_info=False)
                     if quote is not None:
                         self._send_message(channel.name, quote)
 
@@ -259,7 +257,7 @@ class Bot:
             command = data[1]
 
             if '!' in source and source_nick not in self.nicks:  # update last seen whenever anything happens from some nick
-                self.mail.update_last_seen(source_nick)
+                self.database.update_last_seen(source_nick)
 
             if command == '001':  # RPL_WELCOME: successful client registration
                 if self.nickserv_password is not None and len(self.nickserv_password) > 0:
@@ -315,7 +313,7 @@ class Bot:
 
             if channel is not None:
                 timestamp = int(datetime.datetime.utcnow().timestamp())
-                self.quotes.add_quote(channel.name, timestamp, source_nick, message)  # add message to the quotes database
+                self.database.add_quote(channel.name, timestamp, source_nick, message)  # add message to the quotes database
 
     def _explicit_command(self, command, args, reply_target, source_nick, raw_args):
         channel = self._get_channel(reply_target)
@@ -368,7 +366,7 @@ class Bot:
                 return
 
             author, year, word = parse_quote_command()
-            random_quote = self.quotes.random_quote(reply_target, author, year, word)
+            random_quote = self.database.random_quote(reply_target, author, year, word)
             self._send_message(reply_target, random_quote if random_quote is not None else 'no quotes found :(')
 
         def quote_count():
@@ -377,7 +375,7 @@ class Bot:
                 return
 
             author, year, word = parse_quote_command()
-            count = self.quotes.quote_count(reply_target, author, year, word)
+            count = self.database.quote_count(reply_target, author, year, word)
             self._send_message(reply_target, '%i quotes' % count)
 
         def quote_top(percent=False):
@@ -386,7 +384,7 @@ class Bot:
                 return
 
             author, year, word = parse_quote_command()
-            func = self.quotes.top_percent if percent else self.quotes.top
+            func = self.database.quote_top_percent if percent else self.database.quote_top
             top = func(reply_target, 5, year, word)
             if len(top) > 0:
                 self._send_messages(reply_target, top)
@@ -414,7 +412,7 @@ class Bot:
         def send_mail():
             if len(args) < 2:
                 return
-            self.mail.send(source_nick, args[0], ' '.join(args[1:]))
+            self.database.mail_send(source_nick, args[0], ' '.join(args[1:]))
             self._send_message(source_nick, 'message sent to %s :)' % args[0])
 
         def unsend_mail():
@@ -422,13 +420,13 @@ class Bot:
                 return
             try:
                 id = int(args[0])
-                success = self.mail.unsend(source_nick, id)
+                success = self.database.mail_unsend(source_nick, id)
                 self._send_message(source_nick, 'message %i unsent :)' % id if success else 'message %i wasn\'t found :(')
             except ValueError:
                 pass
 
         def outbox():
-            messages = self.mail.outbox(source_nick)
+            messages = self.database.mail_outbox(source_nick)
             if len(messages) == 0:
                 self._send_message(source_nick, 'no unsent messages')
             else:
@@ -462,61 +460,61 @@ class Bot:
 
         def set_time():
             if len(args) > 0:
-                self._send_message(reply_target, self.quotes.set_time(source_nick, args[0]))
+                self._send_message(reply_target, self.database.set_current_time(source_nick, args[0]))
             else:
                 self._send_message(reply_target, 'missing utc offset :(')
 
         def get_time():
             if len(args) > 0:
-                self._send_message(reply_target, self.quotes.get_time(args[0]))
+                self._send_message(reply_target, self.database.current_time(args[0]))
             else:
                 self._send_message(reply_target, 'missing nick :(')
 
         def help():
             self._send_messages(source_nick, [
                 '!imgur: random imgur link',
-                '!reddit: random reddit link',
-                '!porn: random porn link + longest comment',
-                '!wikihow: random wikihow article',
+                '!isitmovienight: is it movie night?',
                 '!penis: random penis',
-                '!tweet MESSAGE: send MESSAGE as tweet',
-                '!settime UTC_OFFSET: set your timezone',
-                '!time NICK: get current time and timezone for NICK',
+                '!porn: random porn link + longest comment',
                 '!quote [NICK] [YEAR] [?SEARCH]: get a random quote and optionally filter by nick, year or search string. Search string can be enclosed in quotes (?"") to allow spaces',
                 '!quotecount [NICK] [YEAR] [?SEARCH]: same as !quote, but get total number of matches instead',
                 '!quotetop [YEAR] [?SEARCH]: get the top 5 nicks by number of quotes',
                 '!quotetopp [YEAR] [?SEARCH]: same as !quotetop, but use matching:total ratio instead of number of quotes',
+                '!reddit: random reddit link',
+                '!rpg [ACTION]: play the GOTY right here',
                 '!seen NICK: when did the bot last see NICK?',
+                '!settime UTC_OFFSET: set your timezone',
+                '!time NICK: get current time and timezone for NICK',
+                '!tweet MESSAGE: send MESSAGE as tweet',
+                '!wikihow: random wikihow article',
                 # '!send NICK MESSAGE: deliver MESSAGE to NICK once it\'s online',
                 # '!outbox: see your messages that haven\'t been delivered yet',
                 # '!unsend ID: cancel delivery of message with the specified id (listed by !outbox)',
-                '!isitmovienight: is it movie night?',
-                '!rpg [ACTION]: play the GOTY right here'
             ])
 
         command = command.lower()
         commands = {
+            '!die': lambda: admin(die),
             '!help': help,
             '!hi': lambda: self._send_message(reply_target, 'hi %s, jag heter %s, %s heter jag' % (source_nick, self.nicks[self.nick_index], self.nicks[self.nick_index])),
             '!imgur': lambda: self._send_message(reply_target, link_generator.imgur_link()),
-            '!reddit': lambda: self._send_message(reply_target, link_generator.reddit_link()),
-            '!wikihow': lambda: self._send_message(reply_target, link_generator.wikihow_link()),
+            '!isitmovienight': lambda: self._send_message(reply_target, 'maybe :)' if datetime.datetime.utcnow().weekday() in [4, 5] else 'no :('),
             '!penis': penis,
-            '!uptime': uptime,
             '!porn': porn,
             '!quote': quote,
             '!quotecount': quote_count,
             '!quotetop': quote_top,
             '!quotetopp': lambda: quote_top(True),
-            '!settime': set_time,
-            '!time': get_time,
-            '!update': lambda: admin(update),
-            '!isitmovienight': lambda: self._send_message(reply_target, 'maybe :)' if datetime.datetime.utcnow().weekday() in [4, 5] else 'no :('),
+            '!reddit': lambda: self._send_message(reply_target, link_generator.reddit_link()),
             '!rpg': rpg_action,
-            '!seen': lambda: self._send_message(reply_target, self.mail.last_seen(args[0])) if len(args) > 0 else None,
-            '!tweet': tweet,
+            '!seen': lambda: self._send_message(reply_target, self.database.last_seen(args[0])) if len(args) > 0 else None,
+            '!settime': set_time,
             '!su': su,
-            '!die': lambda: admin(die),
+            '!time': get_time,
+            '!tweet': tweet,
+            '!update': lambda: admin(update),
+            '!uptime': uptime,
+            '!wikihow': lambda: self._send_message(reply_target, link_generator.wikihow_link()),
             # '!send': send_mail,
             # '!unsend': unsend_mail,
             # '!outbox': outbox,
@@ -578,7 +576,7 @@ class Bot:
             ((lambda: link_lookup.contains_link(message) and not matched), generic_lookup),  # skip if specific link already matched
             ((lambda: 'undertale' in message.lower()), undertale),
             (tweet_trigger, lambda: self.twitter.tweet(message)),
-            ((lambda: unit_converter.contains_unit(message) and False), convert_units)
+            # ((lambda: unit_converter.contains_unit(message)), convert_units)
         ]
 
         for matcher, func in matchers:
@@ -612,8 +610,7 @@ class Bot:
                     self._send_message(channel.name, 'tell proog that a %s occurred :\'(' % str(type(error)))
 
     def start(self):
-        self.quotes = SqliteQuotes(self.aliases)
-        self.mail = Mail(self.aliases)
+        self.database = Database('nda.db', self.aliases, self.ignore_nicks)
         self.twitter = Twitter(self.twitter_consumer_key, self.twitter_consumer_secret, self.twitter_access_token, self.twitter_access_token_secret)
 
         self._connect()
@@ -621,5 +618,5 @@ class Bot:
 
 
 if __name__ == '__main__':
-    bot = Bot('bot.conf')
-    bot.start()
+    nda = NDA('nda.conf')
+    nda.start()

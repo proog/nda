@@ -21,3 +21,9 @@ def year_to_timestamps(year):
     time_min = int(datetime(year, 1, 1, 0, 0, 0).timestamp())
     time_max = int(datetime(year, 12, 31, 23, 59, 59).timestamp())
     return time_min, time_max
+
+
+def escape_sql_like(word):
+    for char in ['\\', '%', '_']:
+        word = word.replace(char, '\\' + char)
+    return word

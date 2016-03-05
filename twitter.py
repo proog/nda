@@ -47,7 +47,7 @@ class Twitter:
 
 
 if __name__ == '__main__':
-    with open('bot.conf', 'r') as f:
+    with open('nda.conf', 'r') as f:
         conf = json.load(f)
         twitter = Twitter(conf.get('twitter_consumer_key', None),
                           conf.get('twitter_consumer_secret', None),
