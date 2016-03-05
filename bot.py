@@ -344,6 +344,12 @@ class Bot:
 
             return author, year, search if len(search) > 0 else None
 
+        def admin(func):
+            if self._is_admin(source_nick):
+                func()
+            else:
+                self._send_message(reply_target, 'how about no >:(')
+
         def uptime():
             connect_time = self.connect_time.strftime('%Y-%m-%d %H:%M:%S')
             uptime_str = str(datetime.datetime.utcnow() - self.connect_time)
@@ -388,10 +394,6 @@ class Bot:
                 self._send_message(reply_target, 'no quotes found :(')
 
         def update():
-            if not self._is_admin(source_nick):
-                self._send_message(reply_target, 'how about no >:(')
-                return
-
             if shell.git_pull():
                 self._disconnect()
                 time.sleep(5)  # give the server time to process disconnection to prevent nick collision
@@ -400,9 +402,8 @@ class Bot:
                 self._send_message(reply_target, 'pull failed, manual update required :(')
 
         def shell_command():
-            if self._is_admin(source_nick):
-                output = shell.run(' '.join(args))
-                self._send_messages(reply_target, output)
+            output = shell.run(' '.join(args))
+            self._send_messages(reply_target, output)
 
         def rpg_action():
             if channel is None:  # only allow rpg play in channel
@@ -453,10 +454,7 @@ class Bot:
                 self._send_message(source_nick, 'how about no >:(')
 
         def die():
-            if self._is_admin(source_nick):
-                raise KeyboardInterrupt
-            else:
-                self._send_message(reply_target, 'how about no >:(')
+            raise KeyboardInterrupt
 
         def penis():
             link = link_generator.penis_link(self.reddit_consumer_key, self.reddit_consumer_secret)
@@ -512,17 +510,17 @@ class Bot:
             '!quotetopp': lambda: quote_top(True),
             '!settime': set_time,
             '!time': get_time,
-            '!update': update,
+            '!update': lambda: admin(update),
             '!isitmovienight': lambda: self._send_message(reply_target, 'maybe :)' if datetime.datetime.utcnow().weekday() in [4, 5] else 'no :('),
             '!rpg': rpg_action,
             '!seen': lambda: self._send_message(reply_target, self.mail.last_seen(args[0])) if len(args) > 0 else None,
             '!tweet': tweet,
             '!su': su,
-            '!die': die,
+            '!die': lambda: admin(die),
             # '!send': send_mail,
             # '!unsend': unsend_mail,
             # '!outbox': outbox,
-            # '!shell': shell_command,
+            # '!shell': lambda: admin(shell_command),
             # '!up': lambda: self._send_multiline_message(reply_target, self.game.up()),
             # '!down': lambda: self._send_multiline_message(reply_target, self.game.down()),
             # '!left': lambda: self._send_multiline_message(reply_target, self.game.left()),
@@ -566,7 +564,7 @@ class Bot:
                 and re.search(self.auto_tweet_regex, m) is not None
 
         def undertale():
-            db = sqlite3.connect('undertale.db')
+            db = sqlite3.connect('ndrtl.db')
             count, = db.execute('SELECT COUNT(*) FROM undertale').fetchone()
             if count > 0:
                 msg, = db.execute('SELECT message FROM undertale WHERE id=?', (random.randint(1, count),)).fetchone()
@@ -615,7 +613,7 @@ class Bot:
 
     def start(self):
         self.quotes = SqliteQuotes(self.aliases)
-        self.mail = Mail()
+        self.mail = Mail(self.aliases)
         self.twitter = Twitter(self.twitter_consumer_key, self.twitter_consumer_secret, self.twitter_access_token, self.twitter_access_token_secret)
 
         self._connect()

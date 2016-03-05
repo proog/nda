@@ -1,11 +1,13 @@
 import sqlite3
 from datetime import datetime
+from util import normalize_nick
 
 
 class Mail:
     db_name = 'mail.db'
 
-    def __init__(self):
+    def __init__(self, aliases=None):
+        self.aliases = aliases if aliases is not None else {}
         self.db = sqlite3.connect(self.db_name)
         self.db.execute('CREATE TABLE IF NOT EXISTS nicks (id INTEGER PRIMARY KEY AUTOINCREMENT, nick TEXT UNIQUE, last_seen INTEGER)')
         self.db.execute('CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, from_nick TEXT, to_nick TEXT, message TEXT, received INTEGER, sent_at INTEGER, received_at INTEGER)')
@@ -14,6 +16,7 @@ class Mail:
         self.db.commit()
 
     def update_last_seen(self, nick, timestamp=None):
+        nick = normalize_nick(nick, self.aliases)
         timestamp = timestamp if timestamp is not None else int(datetime.utcnow().timestamp())
         cursor = self.db.cursor()
         cursor.execute('INSERT OR IGNORE INTO nicks (nick) VALUES (?)', (nick,))
@@ -21,8 +24,9 @@ class Mail:
         self.db.commit()
 
     def last_seen(self, nick):
+        alias = normalize_nick(nick, self.aliases)
         cursor = self.db.cursor()
-        cursor.execute('SELECT last_seen FROM nicks WHERE nick=?', (nick,))
+        cursor.execute('SELECT last_seen FROM nicks WHERE nick=?', (alias,))
         row = cursor.fetchone()
 
         if row is None or row[0] is None:
