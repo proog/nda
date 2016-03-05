@@ -19,6 +19,7 @@ from database import Database
 from maze import Maze
 from rpg.main import RPG
 from twitter import Twitter
+from util import clamp
 
 
 class IRCError(Exception):
@@ -57,6 +58,7 @@ class NDA:
             self.idle_talk = conf.get('idle_talk', False)
             self.auto_tweet_regex = conf.get('auto_tweet_regex', None)
             self.youtube_api_key = conf.get('youtube_api_key', None)
+            self.pastebin_api_key = conf.get('pastebin_api_key', None)
             self.twitter_consumer_key = conf.get('twitter_consumer_key', None)
             self.twitter_consumer_secret = conf.get('twitter_consumer_secret', None)
             self.twitter_access_token = conf.get('twitter_access_token', None)
@@ -391,6 +393,37 @@ class NDA:
             else:
                 self._send_message(reply_target, 'no quotes found :(')
 
+        def quote_context():
+            if channel is None:
+                self._send_message(reply_target, 'command only available in channel :(')
+                return
+
+            if len(args) < 1:
+                self._send_message(reply_target, 'missing sequence id :(')
+                return
+
+            try:
+                seq_id = int(args[0])
+            except ValueError:
+                self._send_message(reply_target, 'bad sequence id :(')
+                return
+
+            lines = 20
+            if len(args) > 1:
+                try:
+                    lines = clamp(0, int(args[1]), 100)
+                except ValueError:
+                    pass
+
+            context = self.database.quote_context(reply_target, seq_id, lines)
+
+            if len(context) == 0:
+                self._send_message(reply_target, 'no context found :(')
+                return
+
+            link = link_generator.make_pastebin('\r\n'.join(context), self.pastebin_api_key)
+            self._send_message(reply_target, link if link is not None else 'couldn\'t upload to pastebin :(')
+
         def update():
             if shell.git_pull():
                 self._disconnect()
@@ -494,6 +527,7 @@ class NDA:
 
         command = command.lower()
         commands = {
+            '!context': quote_context,
             '!die': lambda: admin(die),
             '!help': help,
             '!hi': lambda: self._send_message(reply_target, 'hi %s, jag heter %s, %s heter jag' % (source_nick, self.nicks[self.nick_index], self.nicks[self.nick_index])),

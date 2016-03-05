@@ -1,8 +1,9 @@
 import sqlite3
 import re
 import random
+import json
 from datetime import datetime, timezone, timedelta
-from util import normalize_nick, year_to_timestamps, escape_sql_like
+from util import normalize_nick, year_to_timestamps, escape_sql_like, clamp
 
 
 class Database:
@@ -11,17 +12,45 @@ class Database:
         self.ignore_nicks = ignore_nicks if ignore_nicks is not None else []
 
         self.db = sqlite3.connect(db_name)
-        self.db.execute('CREATE TABLE IF NOT EXISTS quotes (id INTEGER PRIMARY KEY AUTOINCREMENT, channel TEXT, time INTEGER, author TEXT, message TEXT, word_count INTEGER)')
+        self.db.execute('''CREATE TABLE IF NOT EXISTS quotes_sequence (
+            channel TEXT PRIMARY KEY,
+            seq_id  INTEGER NOT NULL)''')
+        self.db.execute('''CREATE TABLE IF NOT EXISTS quotes_full (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            channel    TEXT,
+            time       INTEGER,
+            author     TEXT,
+            raw_author TEXT,
+            message    TEXT,
+            word_count INTEGER,
+            seq_id     INTEGER NOT NULL)''')
+        self.db.execute('''CREATE TABLE IF NOT EXISTS quotes (
+            id      INTEGER PRIMARY KEY,
+            channel TEXT,
+            time    INTEGER,
+            author  TEXT,
+            message TEXT,
+            seq_id  INTEGER NOT NULL)''')
         self.db.execute('CREATE INDEX IF NOT EXISTS idx_channel ON quotes (channel)')
-        self.db.execute('CREATE INDEX IF NOT EXISTS idx_time ON quotes (time)')
-        self.db.execute('CREATE INDEX IF NOT EXISTS idx_author ON quotes (author)')
+        self.db.execute('CREATE INDEX IF NOT EXISTS idx_time    ON quotes (time)')
+        self.db.execute('CREATE INDEX IF NOT EXISTS idx_author  ON quotes (author)')
         self.db.execute('CREATE INDEX IF NOT EXISTS idx_message ON quotes (message)')
-        self.db.execute('CREATE INDEX IF NOT EXISTS idx_word_count ON quotes (word_count)')
 
-        self.db.execute('CREATE TABLE IF NOT EXISTS nicks (id INTEGER PRIMARY KEY AUTOINCREMENT, nick TEXT UNIQUE, last_seen INTEGER, utc_offset INTEGER)')
+        self.db.execute('''CREATE TABLE IF NOT EXISTS nicks (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            nick       TEXT UNIQUE,
+            last_seen  INTEGER,
+            utc_offset INTEGER)''')
 
-        self.db.execute('CREATE TABLE IF NOT EXISTS mail (id INTEGER PRIMARY KEY AUTOINCREMENT, from_nick TEXT, to_nick TEXT, message TEXT, received INTEGER, sent_at INTEGER, received_at INTEGER)')
-        self.db.execute('CREATE INDEX IF NOT EXISTS idx_to_nick ON mail (to_nick)')
+        self.db.execute('''CREATE TABLE IF NOT EXISTS mail (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            from_nick   TEXT,
+            to_nick     TEXT,
+            message     TEXT,
+            received    INTEGER,
+            sent_at     INTEGER,
+            received_at INTEGER)''')
+        self.db.execute('CREATE INDEX IF NOT EXISTS idx_to_nick  ON mail (to_nick)')
         self.db.execute('CREATE INDEX IF NOT EXISTS idx_received ON mail (received)')
         self.db.commit()
 
@@ -54,21 +83,40 @@ class Database:
         return query, params
 
     def add_quote(self, channel, timestamp, author, message, commit=True):
+        raw_author = author
         author = normalize_nick(author, self.aliases)
         message = message.rstrip()  # remove trailing whitespace from message
         word_count = len(message.split())
 
-        if timestamp == 0 or len(author) == 0 or word_count < 5 or author in self.ignore_nicks:
+        if timestamp == 0 or len(author) == 0 or author in self.ignore_nicks:
             return False
 
-        cursor = self.db.cursor()
-        cursor.execute('INSERT INTO quotes (channel, time, author, message, word_count) VALUES (?, ?, ?, ?, ?)',
-                       (channel, timestamp, author, message, word_count))
+        self.db.execute('INSERT OR IGNORE INTO quotes_sequence (channel, seq_id) VALUES (?, ?)', (channel, 0))
+        seq_id, = self.db.execute('SELECT seq_id FROM quotes_sequence WHERE channel=?', (channel,)).fetchone()
+        seq_id += 1  # increment by 1; the id stored in the sequence table will always be the last one used
+
+        self.db.execute('UPDATE quotes_sequence SET seq_id=? WHERE channel=?', (seq_id, channel))
+        self.db.execute('INSERT INTO quotes_full (channel, time, author, raw_author, message, word_count, seq_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                        (channel, timestamp, author, raw_author, message, word_count, seq_id))
+
+        if word_count >= 5:
+            self.db.execute('INSERT INTO quotes (channel, time, author, message, seq_id) VALUES (?, ?, ?, ?, ?)',
+                            (channel, timestamp, author, message, seq_id))
 
         if commit:
             self.db.commit()
 
         return True  # return true if the quote was added
+
+    def quote_context(self, channel, seq_id, lines=20):
+        rows = self.db.execute('SELECT time, raw_author, message FROM quotes_full WHERE channel=? AND seq_id BETWEEN ? AND ? ORDER BY seq_id ASC',
+                               (channel, seq_id - lines, seq_id + lines)).fetchall()
+        messages = []
+        for row in rows:
+            timestamp, author, message = row
+            timestamp_formatted = datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M')
+            messages.append('%s <%s> %s' % (timestamp_formatted, author, message))
+        return messages
 
     def random_quote(self, channel, author=None, year=None, word=None, add_author_info=True):
         num_rows = self.quote_count(channel, author, year, word)
@@ -78,15 +126,15 @@ class Database:
 
         random_skip = random.randint(0, num_rows - 1)
         where, params = self._build_quote_where(channel, author, year, word)
-        query = 'SELECT time, author, message FROM quotes WHERE %s LIMIT 1 OFFSET %i' % (where, random_skip)
+        query = 'SELECT time, author, message, seq_id FROM quotes WHERE %s LIMIT 1 OFFSET %i' % (where, random_skip)
 
         cursor = self.db.cursor()
         cursor.execute(query, params)
 
-        (timestamp, author, message) = cursor.fetchone()
+        (timestamp, author, message, seq_id) = cursor.fetchone()
         date = datetime.utcfromtimestamp(timestamp).strftime('%b %d %Y')
 
-        return '%s -- %s, %s' % (message, author, date) if add_author_info else message
+        return '%s -- %s, %s (s%i)' % (message, author, date, seq_id) if add_author_info else message
 
     def quote_count(self, channel, author=None, year=None, word=None):
         where, params = self._build_quote_where(channel, author, year, word)
@@ -127,7 +175,7 @@ class Database:
 
     def set_current_time(self, nick, utc_offset):
         try:
-            utc_offset = min(max(int(utc_offset), -12), 12)
+            utc_offset = clamp(-12, int(utc_offset), 12)
         except:
             return 'wrong format :('
 
@@ -329,15 +377,19 @@ class Database:
 
 
 if __name__ == '__main__':
-    q = Database('nda.db')
-    #for (nick, msg_count) in sorted(q.dump_irssi_log_authors('gclogs/#garachat-master.log').items(), key=lambda x: x[1], reverse=True):
-    #    if nick not in q.aliases.keys():
-    #        print('%s %i' % (nick, msg_count))
-    #q.add_quote('#garachat', 0, 'ashin', '( ͡° ͜ʖ ͡°)')
-    #q.import_irssi_log('gclogs/#garachat-master.log', '#garachat', 0)
-    print(q.quote_top(channel='#garachat', size=5))
-    print(q.random_quote(channel='#garachat', author='ashin', year=2010))
-    print(q.quote_count(channel='#garachat', author='sarah'))
-    print(q.random_quote(channel='#garachat', author='duo', word='fuck you guys'))
-    print(q.quote_top_percent(channel='#garachat', year=None, word='cup'))
-    q.close()
+    with open('nda.conf', 'r') as f:
+        conf = json.load(f)
+        q = Database('nda.db', conf.get('aliases', {}), conf.get('ignore_nicks', []))
+        # for (nick, msg_count) in sorted(q.dump_irssi_log_authors('gclogs/#garachat-master.log').items(), key=lambda x: x[1], reverse=True):
+        #     if nick not in q.aliases.keys():
+        #         print('%s %i' % (nick, msg_count))
+        # q.add_quote('#garachat', 0, 'ashin', '( ͡° ͜ʖ ͡°)')
+        # q.import_irssi_log('gclogs/#garachat-master.log', '#garachat', 0)
+        print(q.quote_top(channel='#garachat', size=5))
+        print(q.random_quote(channel='#garachat', author='ashin', year=2010))
+        print(q.quote_count(channel='#garachat', author='sarah'))
+        print(q.random_quote(channel='#garachat', author='duo', word='fuck you guys'))
+        print(q.quote_top_percent(channel='#garachat', year=None, word='cup'))
+        print(q.quote_context(channel='#garachat', seq_id=183047))
+
+        q.close()

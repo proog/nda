@@ -157,6 +157,22 @@ def penis_link(consumer_key, consumer_secret):
 
     return '%s -- %s' % (url, title)
 
+
+def make_pastebin(text, pastebin_api_key):
+    url = 'http://pastebin.com/api/api_post.php'
+    data = {
+        'api_dev_key': pastebin_api_key,
+        'api_option': 'paste',
+        'api_paste_code': text
+    }
+
+    try:
+        response = requests.post(url, data)
+        return response.text if response.text.startswith('http://') else None
+    except:
+        return None
+
+
 if __name__ == '__main__':
     print('found: ' + imgur_link())
     print('found: ' + reddit_link())
@@ -169,3 +185,4 @@ if __name__ == '__main__':
         consumer_secret = conf.get('reddit_consumer_secret', None)
         print(penis_link(consumer_key, consumer_secret))
         print(penis_link(consumer_key, consumer_secret))
+        print(make_pastebin('nda says hi :)', conf.get('pastebin_api_key', None)))

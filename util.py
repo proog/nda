@@ -27,3 +27,7 @@ def escape_sql_like(word):
     for char in ['\\', '%', '_']:
         word = word.replace(char, '\\' + char)
     return word
+
+
+def clamp(minimum, i, maximum):
+    return max(minimum, min(i, maximum))
