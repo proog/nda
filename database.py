@@ -266,7 +266,7 @@ class Database:
         skipped = 0
         log_date = datetime.utcfromtimestamp(0)
 
-        with open(filename, 'r', encoding='utf-8', errors='ignore') as log:
+        with open(filename, 'r', encoding='utf-8') as log:
             for line in log:
                 lines += 1
 
@@ -314,7 +314,7 @@ class Database:
         skipped = 0
         year = 1970
 
-        with open(filename, 'r', encoding='utf-8', errors='ignore') as log:
+        with open(filename, 'r', encoding='utf-8') as log:
             for line in log:
                 lines += 1
 
