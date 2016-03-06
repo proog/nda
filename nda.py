@@ -35,12 +35,13 @@ class Channel:
 
 
 class NDA:
-    buffer_size = 4096
-    receive_timeout = 0.5
-    ping_timeout = 180
+    buffer_size = 4096     # buffer size for each socket read
+    receive_timeout = 0.5  # how long to wait for socket data in each main loop iteration
+    ping_timeout = 240     # how long to wait before pinging the server, and how long to wait for a pong
     passive_interval = 60  # how long between performing passive, input independent operations like mail
-    admin_duration = 30
-    crlf = '\r\n'
+    admin_duration = 30    # how long an admin session is active after authenticating with !su
+    ping_text = 'nda'      # text to send with pings
+    crlf = '\r\n'          # irc message delimiter
 
     def __init__(self, conf_file):
         with open(conf_file, 'r', encoding='utf-8') as f:
@@ -72,10 +73,10 @@ class NDA:
         self.unfinished_line = ''
         self.nick_index = 0
         self.admin_sessions = {}
-        self.connect_time = None
-        self.last_ping = None
+        self.connect_time = datetime.datetime.min
+        self.last_ping = datetime.datetime.min
         self.waiting_for_pong = False
-        self.last_passive = None
+        self.last_passive = datetime.datetime.min
         self.database = None
         self.twitter = None
 
@@ -116,6 +117,8 @@ class NDA:
     def _ping(self, msg):
         self._log('Sending PING :%s' % msg)
         self._send('PING :%s' % msg)
+        self.waiting_for_pong = True
+        self.last_ping = datetime.datetime.utcnow()
 
     def _pong(self, msg):
         self._log('Sending PONG :%s' % msg)
@@ -170,24 +173,25 @@ class NDA:
         return self._readline()  # recurse until a finished line is found or nothing is received within timeout
 
     def _connect(self):
+        now = datetime.datetime.utcnow()
         self.lines = []
         self.unfinished_line = ''
         self.nick_index = 0
         self.admin_sessions = {}
+        self.connect_time = now
+        self.waiting_for_pong = False
+        self.last_ping = now
+        self.last_passive = now
 
         self._log('Connecting to %s:%s' % (self.address, self.port))
         self.irc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.irc.connect((self.address, self.port))
-        self.connect_time = datetime.datetime.utcnow()
-        self.waiting_for_pong = False
-        self.last_ping = datetime.datetime.utcnow()
-        self.last_passive = datetime.datetime.utcnow()
+
         self._send('USER %s 8 * :%s' % (self.user, self.real_name))
         self._change_nick(self.nicks[self.nick_index])
 
     def _disconnect(self):
         self._log('Disconnecting from %s:%s' % (self.address, self.port))
-        self.database.close()
 
         try:
             self._send('QUIT :%s' % self.quit_message)
@@ -198,19 +202,18 @@ class NDA:
     def _execute_passive(self):
         now = datetime.datetime.utcnow()
 
-        # if we don't receive a pong within the timeout, something strange happened and we want to reconnect
-        if self.waiting_for_pong and (now - self.last_ping).total_seconds() > self.ping_timeout:
-            raise IRCError('No PONG received from the server in %i seconds' % self.ping_timeout)
+        # if the last ping (server or client) happened over ping_timeout seconds ago, let's follow up on that
+        # if we did not already send a ping, the server hasn't pinged us in a while, so ping it once
+        # if that ping doesn't trigger a pong within the timeout, the server is in limbo and we want to reconnect
+        if (now - self.last_ping).total_seconds() > self.ping_timeout:
+            if self.waiting_for_pong:
+                raise IRCError('No PONG received from the server in %i seconds' % self.ping_timeout)
+            else:
+                self._ping(self.ping_text)
 
         # perform various passive operations if the interval is up
         if (now - self.last_passive).total_seconds() < self.passive_interval:
             return
-
-        # ping the server
-        if not self.waiting_for_pong:
-            self._ping('nda')
-            self.waiting_for_pong = True
-            self.last_ping = datetime.datetime.utcnow()
 
         # check if any nicks with unread messages have come online (disabled for now)
         # unread_receivers = self.database.mail_unread_receivers()
@@ -251,6 +254,7 @@ class NDA:
 
             if command == 'PING':
                 self._pong(' '.join(data[1:]).lstrip(':'))
+                self.last_ping = datetime.datetime.utcnow()
             elif command == 'ERROR':
                 raise IRCError(line)
         else:
@@ -505,6 +509,7 @@ class NDA:
 
         def help():
             self._send_messages(source_nick, [
+                '!context ID [NUM_LINES]: pastebin context for a quote, optionally with number of lines (default is 20)',
                 '!imgur: random imgur link',
                 '!isitmovienight: is it movie night?',
                 '!penis: random penis',
@@ -649,6 +654,8 @@ class NDA:
 
         self._connect()
         self._main_loop()
+
+        self.database.close()
 
 
 if __name__ == '__main__':
