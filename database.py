@@ -12,35 +12,31 @@ class Database:
         self.ignore_nicks = ignore_nicks if ignore_nicks is not None else []
 
         self.db = sqlite3.connect(db_name)
-        self.db.execute('''CREATE TABLE IF NOT EXISTS quotes_sequence (
-            channel TEXT PRIMARY KEY,
+        self.db.execute('''CREATE TABLE IF NOT EXISTS channels (
+            channel TEXT NOT NULL PRIMARY KEY,
             seq_id  INTEGER NOT NULL)''')
         self.db.execute('''CREATE TABLE IF NOT EXISTS quotes_full (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
-            channel    TEXT,
+            channel    TEXT NOT NULL,
+            seq_id     INTEGER NOT NULL,
             time       INTEGER,
             author     TEXT,
             raw_author TEXT,
             message    TEXT,
             word_count INTEGER,
-            seq_id     INTEGER NOT NULL)''')
-        self.db.execute('CREATE INDEX IF NOT EXISTS idx_channel ON quotes_full (channel)')
-        self.db.execute('CREATE INDEX IF NOT EXISTS idx_seq_id  ON quotes_full (seq_id)')
+            PRIMARY KEY (channel, seq_id))''')
         self.db.execute('''CREATE TABLE IF NOT EXISTS quotes (
-            id      INTEGER PRIMARY KEY,
-            channel TEXT,
+            channel TEXT NOT NULL,
+            seq_id  INTEGER NOT NULL,
             time    INTEGER,
             author  TEXT,
             message TEXT,
-            seq_id  INTEGER NOT NULL)''')
-        self.db.execute('CREATE INDEX IF NOT EXISTS idx_channel ON quotes (channel)')
+            PRIMARY KEY (channel, seq_id))''')
         self.db.execute('CREATE INDEX IF NOT EXISTS idx_time    ON quotes (time)')
         self.db.execute('CREATE INDEX IF NOT EXISTS idx_author  ON quotes (author)')
         self.db.execute('CREATE INDEX IF NOT EXISTS idx_message ON quotes (message)')
 
         self.db.execute('''CREATE TABLE IF NOT EXISTS nicks (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
-            nick       TEXT UNIQUE,
+            nick       TEXT NOT NULL PRIMARY KEY,
             last_seen  INTEGER,
             utc_offset INTEGER)''')
 
@@ -93,17 +89,17 @@ class Database:
         if timestamp == 0 or len(author) == 0 or author in self.ignore_nicks:
             return False
 
-        self.db.execute('INSERT OR IGNORE INTO quotes_sequence (channel, seq_id) VALUES (?, ?)', (channel, 0))
-        seq_id, = self.db.execute('SELECT seq_id FROM quotes_sequence WHERE channel=?', (channel,)).fetchone()
+        self.db.execute('INSERT OR IGNORE INTO channels (channel, seq_id) VALUES (?, ?)', (channel, 0))
+        seq_id, = self.db.execute('SELECT seq_id FROM channels WHERE channel=?', (channel,)).fetchone()
         seq_id += 1  # increment by 1; the id stored in the sequence table will always be the last one used
 
-        self.db.execute('UPDATE quotes_sequence SET seq_id=? WHERE channel=?', (seq_id, channel))
-        self.db.execute('INSERT INTO quotes_full (channel, time, author, raw_author, message, word_count, seq_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                        (channel, timestamp, author, raw_author, message, word_count, seq_id))
+        self.db.execute('UPDATE channels SET seq_id=? WHERE channel=?', (seq_id, channel))
+        self.db.execute('INSERT INTO quotes_full (channel, seq_id, time, author, raw_author, message, word_count) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                        (channel, seq_id, timestamp, author, raw_author, message, word_count))
 
         if word_count >= 5:
-            self.db.execute('INSERT INTO quotes (channel, time, author, message, seq_id) VALUES (?, ?, ?, ?, ?)',
-                            (channel, timestamp, author, message, seq_id))
+            self.db.execute('INSERT INTO quotes (channel, seq_id, time, author, message) VALUES (?, ?, ?, ?, ?)',
+                            (channel, seq_id, timestamp, author, message))
 
         if commit:
             self.db.commit()
@@ -128,12 +124,12 @@ class Database:
 
         random_skip = random.randint(0, num_rows - 1)
         where, params = self._build_quote_where(channel, author, year, word)
-        query = 'SELECT time, author, message, seq_id FROM quotes WHERE %s LIMIT 1 OFFSET %i' % (where, random_skip)
+        query = 'SELECT seq_id, time, author, message FROM quotes WHERE %s LIMIT 1 OFFSET %i' % (where, random_skip)
 
         cursor = self.db.cursor()
         cursor.execute(query, params)
 
-        (timestamp, author, message, seq_id) = cursor.fetchone()
+        (seq_id, timestamp, author, message) = cursor.fetchone()
         date = datetime.utcfromtimestamp(timestamp).strftime('%b %d %Y')
 
         return '%s -- %s, %s (%i)' % (message, author, date, seq_id) if add_author_info else message
