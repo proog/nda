@@ -24,6 +24,8 @@ class Database:
             message    TEXT,
             word_count INTEGER,
             seq_id     INTEGER NOT NULL)''')
+        self.db.execute('CREATE INDEX IF NOT EXISTS idx_channel ON quotes_full (channel)')
+        self.db.execute('CREATE INDEX IF NOT EXISTS idx_seq_id  ON quotes_full (seq_id)')
         self.db.execute('''CREATE TABLE IF NOT EXISTS quotes (
             id      INTEGER PRIMARY KEY,
             channel TEXT,
