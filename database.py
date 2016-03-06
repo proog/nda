@@ -16,13 +16,12 @@ class Database:
             channel TEXT NOT NULL PRIMARY KEY,
             seq_id  INTEGER NOT NULL)''')
         self.db.execute('''CREATE TABLE IF NOT EXISTS quotes_full (
-            channel    TEXT NOT NULL,
-            seq_id     INTEGER NOT NULL,
-            time       INTEGER,
-            author     TEXT,
-            raw_author TEXT,
-            message    TEXT,
-            word_count INTEGER,
+            channel     TEXT NOT NULL,
+            seq_id      INTEGER NOT NULL,
+            time        INTEGER,
+            raw_author  TEXT,
+            raw_message TEXT,
+            word_count  INTEGER,
             PRIMARY KEY (channel, seq_id))''')
         self.db.execute('''CREATE TABLE IF NOT EXISTS quotes (
             channel TEXT NOT NULL,
@@ -82,6 +81,7 @@ class Database:
 
     def add_quote(self, channel, timestamp, author, message, commit=True):
         raw_author = author
+        raw_message = message
         author = normalize_nick(author, self.aliases)
         message = message.rstrip()  # remove trailing whitespace from message
         word_count = len(message.split())
@@ -94,8 +94,8 @@ class Database:
         seq_id += 1  # increment by 1; the id stored in the sequence table will always be the last one used
 
         self.db.execute('UPDATE channels SET seq_id=? WHERE channel=?', (seq_id, channel))
-        self.db.execute('INSERT INTO quotes_full (channel, seq_id, time, author, raw_author, message, word_count) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                        (channel, seq_id, timestamp, author, raw_author, message, word_count))
+        self.db.execute('INSERT INTO quotes_full (channel, seq_id, time, raw_author, raw_message, word_count) VALUES (?, ?, ?, ?, ?, ?)',
+                        (channel, seq_id, timestamp, raw_author, raw_message, word_count))
 
         if word_count >= 5:
             self.db.execute('INSERT INTO quotes (channel, seq_id, time, author, message) VALUES (?, ?, ?, ?, ?)',
@@ -107,7 +107,7 @@ class Database:
         return True  # return true if the quote was added
 
     def quote_context(self, channel, seq_id, lines=20):
-        rows = self.db.execute('SELECT time, raw_author, message FROM quotes_full WHERE channel=? AND seq_id BETWEEN ? AND ? ORDER BY seq_id ASC',
+        rows = self.db.execute('SELECT time, raw_author, raw_message FROM quotes_full WHERE channel=? AND seq_id BETWEEN ? AND ? ORDER BY seq_id ASC',
                                (channel, seq_id - lines, seq_id + lines)).fetchall()
         messages = []
         for row in rows:
