@@ -116,6 +116,18 @@ class Database:
             messages.append('%s <%s> %s' % (timestamp_formatted, author, message))
         return messages
 
+    def quote_by_seq_id(self, channel, seq_id):
+        quote = self.db.execute('SELECT seq_id, time, raw_author, raw_message FROM quotes_full WHERE channel=? AND seq_id=?',
+                                (channel, seq_id)).fetchone()
+
+        if quote is None:
+            return None
+
+        (seq_id, timestamp, author, message) = quote
+        date = datetime.utcfromtimestamp(timestamp).strftime('%b %d %Y')
+
+        return '%s -- %s, %s (%i)' % (message, normalize_nick(author, self.aliases), date, seq_id)
+
     def random_quote(self, channel, author=None, year=None, word=None, add_author_info=True):
         num_rows = self.quote_count(channel, author, year, word)
 
@@ -389,5 +401,6 @@ if __name__ == '__main__':
         print(q.random_quote(channel='#garachat', author='duo', word='fuck you guys'))
         print(q.quote_top_percent(channel='#garachat', year=None, word='cup'))
         print(q.quote_context(channel='#garachat', seq_id=183047))
+        print(q.quote_by_seq_id(channel='#garachat', seq_id=183047))
 
         q.close()

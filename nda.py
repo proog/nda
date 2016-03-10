@@ -375,6 +375,23 @@ class NDA:
             random_quote = self.database.random_quote(reply_target, author, year, word)
             self._send_message(reply_target, random_quote if random_quote is not None else 'no quotes found :(')
 
+        def quote_id():
+            if channel is None:  # only allow quote requests in a channel
+                self._send_message(reply_target, 'command only available in channel :(')
+                return
+            if len(args) < 1:
+                self._send_message(reply_target, 'missing sequence id :(')
+                return
+
+            try:
+                seq_id = int(args[0])
+            except ValueError:
+                self._send_message(reply_target, 'bad sequence id :(')
+                return
+
+            quote = self.database.quote_by_seq_id(reply_target, seq_id)
+            self._send_message(reply_target, quote if quote is not None else 'quote not found :(')
+
         def quote_count():
             if channel is None:
                 self._send_message(reply_target, 'command only available in channel :(')
@@ -542,6 +559,7 @@ class NDA:
             '!porn': porn,
             '!quote': quote,
             '!quotecount': quote_count,
+            '!quoteid': quote_id,
             '!quotetop': quote_top,
             '!quotetopp': lambda: quote_top(True),
             '!reddit': lambda: self._send_message(reply_target, link_generator.reddit_link()),
