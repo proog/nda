@@ -79,7 +79,7 @@ class Database:
 
         return query, params
 
-    def add_quote(self, channel, timestamp, author, message, commit=True, command=False):
+    def add_quote(self, channel, timestamp, author, message, commit=True, full_only=False):
         raw_author = author
         raw_message = message
         author = normalize_nick(author, self.aliases)
@@ -98,7 +98,7 @@ class Database:
                         (channel, seq_id, timestamp, raw_author, raw_message, word_count))
 
         # if the message is long enough, wasn't made by an ignored nick, and wasn't an explicit command, add it to the fast table
-        if word_count >= 5 and author not in self.ignore_nicks and not command:
+        if word_count >= 5 and author not in self.ignore_nicks and not full_only:
             self.db.execute('INSERT INTO quotes (channel, seq_id, time, author, message) VALUES (?, ?, ?, ?, ?)',
                             (channel, seq_id, timestamp, author, message))
 

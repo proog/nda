@@ -318,7 +318,7 @@ class NDA:
         if channel is not None:
             channel.idle_timer.message_received()  # notify idle timer that someone talked
             timestamp = int(datetime.datetime.utcnow().timestamp())
-            self.database.add_quote(channel.name, timestamp, source_nick, message, command=handled)  # add message to the quotes database
+            self.database.add_quote(channel.name, timestamp, source_nick, message, full_only=handled)  # add message to the quotes database
 
         # implicit commands
         if not handled:
