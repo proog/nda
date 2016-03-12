@@ -110,6 +110,11 @@ class NDA:
         for chunk in chunks:
             self._send(command + chunk + self.crlf)
 
+        # add own message to the quotes database
+        if self._get_channel(to) is not None:
+            timestamp = int(datetime.datetime.utcnow().timestamp())
+            self.database.add_quote(to, timestamp, self.nicks[self.nick_index], msg)
+
     def _send_messages(self, to, msgs):
         for msg in msgs:
             self._send_message(to, msg)
@@ -312,14 +317,12 @@ class NDA:
 
         if channel is not None:
             channel.idle_timer.message_received()  # notify idle timer that someone talked
+            timestamp = int(datetime.datetime.utcnow().timestamp())
+            self.database.add_quote(channel.name, timestamp, source_nick, message, command=handled)  # add message to the quotes database
 
+        # implicit commands
         if not handled:
-            # implicit commands
             self._implicit_command(message, reply_target, source_nick)
-
-            if channel is not None:
-                timestamp = int(datetime.datetime.utcnow().timestamp())
-                self.database.add_quote(channel.name, timestamp, source_nick, message)  # add message to the quotes database
 
     def _explicit_command(self, command, args, reply_target, source_nick, raw_args):
         channel = self._get_channel(reply_target)

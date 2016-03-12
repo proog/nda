@@ -79,14 +79,14 @@ class Database:
 
         return query, params
 
-    def add_quote(self, channel, timestamp, author, message, commit=True):
+    def add_quote(self, channel, timestamp, author, message, commit=True, command=False):
         raw_author = author
         raw_message = message
         author = normalize_nick(author, self.aliases)
         message = message.rstrip()  # remove trailing whitespace from message
         word_count = len(message.split())
 
-        if timestamp == 0 or len(author) == 0 or author in self.ignore_nicks:
+        if timestamp == 0 or len(author) == 0:
             return False
 
         self.db.execute('INSERT OR IGNORE INTO channels (channel, seq_id) VALUES (?, ?)', (channel, 0))
@@ -97,7 +97,8 @@ class Database:
         self.db.execute('INSERT INTO quotes_full (channel, seq_id, time, raw_author, raw_message, word_count) VALUES (?, ?, ?, ?, ?, ?)',
                         (channel, seq_id, timestamp, raw_author, raw_message, word_count))
 
-        if word_count >= 5:
+        # if the message is long enough, wasn't made by an ignored nick, and wasn't an explicit command, add it to the fast table
+        if word_count >= 5 and author not in self.ignore_nicks and not command:
             self.db.execute('INSERT INTO quotes (channel, seq_id, time, author, message) VALUES (?, ?, ?, ?, ?)',
                             (channel, seq_id, timestamp, author, message))
 
