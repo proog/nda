@@ -131,7 +131,7 @@ def get_reddit_access_token(consumer_key, consumer_secret, user_agent):
 
 def penis_link(consumer_key, consumer_secret):
     user_agent = 'nda_reddit:v0.1'
-    subreddit = random.choice(['massivecock', 'penis', 'softies', 'autofellatio', 'tinydick', 'selfservice', 'guysgonewild', 'totallystraight'])
+    subreddit = random.choice(['massivecock', 'penis', 'softies', 'autofellatio', 'tinydick', 'selfservice', 'guysgonewild', 'totallystraight', 'ratemycock'])
     listing = random.choice(['new', 'hot', 'controversial'])
     api_url = 'https://oauth.reddit.com/r/%s/%s?limit=20&raw_json=1' % (subreddit, listing)
     access_token = get_reddit_access_token(consumer_key, consumer_secret, user_agent)

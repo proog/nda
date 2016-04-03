@@ -28,6 +28,19 @@ def contains_youtube(message):
     return extract_youtube_id(message) is not None
 
 
+def youtube_duration(duration):
+    split = re.split(r'[^\d]+', duration)
+    padded = [x.zfill(2) for x in split if len(x) > 0]
+    pretty = ':'.join(padded)
+
+    if len(pretty) == 2:
+        pretty = '0:' + pretty  # add zero minute for <1 minute times
+    elif pretty.startswith('0'):
+        pretty = pretty[1:]  # strip leading zero for >1 minute times
+
+    return pretty
+
+
 def youtube_lookup(message, youtube_api_key):
     if youtube_api_key is None or len(youtube_api_key) == 0:
         return None
@@ -46,22 +59,7 @@ def youtube_lookup(message, youtube_api_key):
 
         if 'items' in json_data and len(json_data['items']) > 0:
             title = json_data['items'][0]['snippet']['title']
-
-            duration_replace = {
-                'P': '',
-                'W': ':',
-                'D': ':',
-                'T': '',
-                'H': ':',
-                'M': ':',
-                'S': ''
-            }
-            duration = json_data['items'][0]['contentDetails']['duration']
-            for a, b in duration_replace.items():
-                duration = duration.replace(a, b)
-            duration = ':'.join([x.zfill(2) for x in duration.split(':')]).lstrip('0')
-            if ':' not in duration:  # if under a minute, add 0: to the front
-                duration = '0:' + duration
+            duration = youtube_duration(json_data['items'][0]['contentDetails']['duration'])
             return '%s [%s]' % (title, duration)
         else:
             return None

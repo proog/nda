@@ -212,20 +212,30 @@ class IRC:
                 self.message_received(message, reply_target, source_nick)
 
     def _main_loop(self):
+        disconnect = False
+        connect = True
+
         while True:
             try:
+                if disconnect:
+                    self._disconnect('an error occurred, reconnecting')
+                    disconnect = False
+                    time.sleep(5)
+
+                if connect:
+                    self._connect()
+                    connect = False
+
                 self._receive()
                 self.main_loop_iteration()
             except IRCError as irc_error:
                 self.log('IRC error: %s' % irc_error.args)
-                self._disconnect('irc error :(')
-                time.sleep(5)
-                self._connect()
+                disconnect = True
+                connect = True
             except OSError as os_error:
-                self.log('OS error (errno %i): %s' % (os_error.errno, os_error.strerror))
-                self._disconnect('os error :(')
-                time.sleep(5)
-                self._connect()
+                self.log('OS error (errno %s): %s' % (str(os_error.errno), os_error.strerror))
+                disconnect = True
+                connect = True
             except KeyboardInterrupt:
                 self._disconnect('nda loves you :)')
                 break
@@ -233,10 +243,10 @@ class IRC:
                 self.log('Unknown error (%s): %s' % (str(type(error)), error.args))
                 self.log(traceback.format_exc())
                 self.unknown_error_occurred(error)
+                time.sleep(10)
 
     def start(self):
         self.started()
-        self._connect()
         self._main_loop()
         self.stopped()
 
