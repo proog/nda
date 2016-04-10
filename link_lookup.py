@@ -29,16 +29,29 @@ def contains_youtube(message):
 
 
 def youtube_duration(duration):
-    split = re.split(r'[^\d]+', duration)
-    padded = [x.zfill(2) for x in split if len(x) > 0]
-    pretty = ':'.join(padded)
+    match = re.match(r'^P(\d+W)?(\d+D)?T(\d+H)?(\d+M)?(\d+S)?$', duration)
 
-    if len(pretty) == 2:
-        pretty = '0:' + pretty  # add zero minute for <1 minute times
-    elif pretty.startswith('0'):
-        pretty = pretty[1:]  # strip leading zero for >1 minute times
+    if match is None:
+        return 'unknown duration'
 
-    return pretty
+    tokens = ['0', '00']
+    started = False
+    for group in match.groups():
+        if group is not None and not started:
+            started = True
+            tokens = []
+
+        if started:
+            tokens.append(group[:-1].zfill(2) if group is not None else '00')
+
+    joined = ':'.join(tokens)
+
+    if len(joined) == 2:
+        joined = '0:' + joined  # add zero minute for <1 minute times
+    elif joined.startswith('0'):
+        joined = joined[1:]  # strip leading zero for >1 minute times
+
+    return joined
 
 
 def youtube_lookup(message, youtube_api_key):
@@ -198,6 +211,7 @@ if __name__ == '__main__':
         youtube_api_key = json.load(f).get('youtube_api_key', None)
 
     print(youtube_lookup('https://www.youtube.com/watch?v=g6QW-rFtKfA&feature=youtu.be&t=1529', youtube_api_key))
+    print(youtube_lookup('https://www.youtube.com/watch?v=TyTdO5RZY3c', youtube_api_key))
     print(generic_lookup('hi here is a link for you https://twitter.com/qataraxia/status/672901207845961728'))
     print(xhamster_comment('http://xhamster.com/movies/3949336/merry_christmas_and_happy_new_year.html'))
     print(generic_lookup('http://i.imgur.com/wtWCbcf.gifv'))
