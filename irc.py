@@ -15,7 +15,8 @@ class IRCError(Exception):
 class IRC:
     buffer_size = 4096     # buffer size for each socket read
     receive_timeout = 0.5  # how long to wait for socket data in each main loop iteration
-    ping_timeout = 240     # how long to wait before pinging the server, and how long to wait for a pong
+    ping_wait = 200        # how long to wait before pinging the server
+    ping_timeout = 10      # and how long to wait for a pong when pinging
     ping_text = 'nda'      # text to send with pings
     crlf = '\r\n'          # irc message delimiter
 
@@ -150,14 +151,14 @@ class IRC:
         now = datetime.utcnow()
         line = self._readline()  # a line or None if nothing received
 
-        # if the last ping (server or client) happened over ping_timeout seconds ago, let's follow up on that
+        # if the last ping (server or client) happened over ping_wait seconds ago, let's follow up on that
         # if we did not already send a ping, the server hasn't pinged us in a while, so ping it once
-        # if that ping doesn't trigger a pong within the timeout, the server is in limbo and we want to reconnect
-        if (now - self.last_ping).total_seconds() > self.ping_timeout:
-            if self.waiting_for_pong:
-                raise IRCError('No PONG received from the server in %i seconds' % self.ping_timeout)
-            else:
-                self._ping(self.ping_text)
+        # if that ping doesn't trigger a pong within ping_timeout, the server is in limbo and we want to reconnect
+        if not self.waiting_for_pong and (now - self.last_ping).total_seconds() > self.ping_wait:
+            self.log('No PING received from the server in %i seconds' % self.ping_wait)
+            self._ping(self.ping_text)
+        elif self.waiting_for_pong and (now - self.last_ping).total_seconds() > self.ping_timeout:
+            raise IRCError('No PONG received from the server in %i seconds' % self.ping_timeout)
 
         if line is None:
             return
