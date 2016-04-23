@@ -10,6 +10,7 @@ import re
 import greetings
 import sqlite3
 import random
+import redis
 from datetime import datetime
 from irc import IRC
 from idle_talk import IdleTimer
@@ -17,7 +18,7 @@ from database import Database
 from maze import Maze
 from rpg.main import RPG
 from twitter import Twitter
-from util import clamp
+from util import clamp, is_channel
 
 
 class Channel:
@@ -31,6 +32,7 @@ class Channel:
 class NDA(IRC):
     passive_interval = 60  # how long between performing passive, input independent operations like mail
     admin_duration = 30    # how long an admin session is active after authenticating with !su
+    redis_prefix = 'nda:'
 
     def __init__(self, conf_file):
         with open(conf_file, 'r', encoding='utf-8') as f:
@@ -48,18 +50,26 @@ class NDA(IRC):
             self.auto_tweet_regex = conf.get('auto_tweet_regex', None)
             self.youtube_api_key = conf.get('youtube_api_key', None)
             self.pastebin_api_key = conf.get('pastebin_api_key', None)
-            self.twitter_consumer_key = conf.get('twitter_consumer_key', None)
-            self.twitter_consumer_secret = conf.get('twitter_consumer_secret', None)
-            self.twitter_access_token = conf.get('twitter_access_token', None)
-            self.twitter_access_token_secret = conf.get('twitter_access_token_secret', None)
             self.reddit_consumer_key = conf.get('reddit_consumer_key', None)
             self.reddit_consumer_secret = conf.get('reddit_consumer_secret', None)
-            self.aliases = conf.get('aliases', {})
-            self.ignore_nicks = conf.get('ignore_nicks', [])
+            use_redis = conf.get('use_redis', False)
+            twitter_consumer_key = conf.get('twitter_consumer_key', None)
+            twitter_consumer_secret = conf.get('twitter_consumer_secret', None)
+            twitter_access_token = conf.get('twitter_access_token', None)
+            twitter_access_token_secret = conf.get('twitter_access_token_secret', None)
+            aliases = conf.get('aliases', {})
+            ignore_nicks = conf.get('ignore_nicks', [])
         self.admin_sessions = {}
         self.last_passive = datetime.min
-        self.database = None
-        self.twitter = None
+        self.database = Database('nda.db', aliases, ignore_nicks)
+        self.twitter = Twitter(twitter_consumer_key, twitter_consumer_secret, twitter_access_token, twitter_access_token_secret)
+
+        if use_redis:
+            try:
+                self.redis_sub = redis.StrictRedis().pubsub(ignore_subscribe_messages=True)
+                self.redis_sub.psubscribe('%s*' % self.redis_prefix)
+            except:
+                self.redis_sub = None
 
         super().__init__(address, port, user, real_name, nicks, nickserv_password, logging)
 
@@ -67,12 +77,10 @@ class NDA(IRC):
         for channel in self.channels:
             self.send_message(channel.name, 'tell proog that a %s occurred :\'(' % str(type(error)))
 
-    def started(self):
-        self.database = Database('nda.db', self.aliases, self.ignore_nicks)
-        self.twitter = Twitter(self.twitter_consumer_key, self.twitter_consumer_secret, self.twitter_access_token, self.twitter_access_token_secret)
-
     def stopped(self):
         self.database.close()
+        if self.redis_sub is not None:
+            self.redis_sub.close()
 
     def connected(self):
         self.admin_sessions = {}
@@ -88,10 +96,11 @@ class NDA(IRC):
             self.database.add_quote(to, timestamp, self.current_nick(), message, full_only=True)
 
     def main_loop_iteration(self):
-        now = datetime.utcnow()
+        # check for external input
+        self.redis_input()
 
         # perform various passive operations if the interval is up
-        if (now - self.last_passive).total_seconds() < self.passive_interval:
+        if (datetime.utcnow() - self.last_passive).total_seconds() < self.passive_interval:
             return
 
         # check if any nicks with unread messages have come online (disabled for now)
@@ -295,8 +304,10 @@ class NDA(IRC):
         def send_mail():
             if len(args) < 2:
                 return
-            self.database.mail_send(source_nick, args[0], ' '.join(args[1:]))
-            self.send_message(source_nick, 'message sent to %s :)' % args[0])
+            to = args[0]
+            msg = ' '.join(args[1:])
+            self.database.mail_send(source_nick, to, msg)
+            self.send_message(source_nick, 'message sent to %s :)' % to)
 
         def unsend_mail():
             if len(args) < 1:
@@ -487,6 +498,23 @@ class NDA(IRC):
         if len(messages) > 0:
             self.send_message(to, 'you have %i unread message(s)' % len(messages))
             self.send_messages(to, messages)
+
+    def redis_input(self):
+        while self.redis_sub is not None:
+            d = self.redis_sub.get_message()
+
+            if d is None:
+                break
+            if d['type'] != 'pmessage':
+                continue
+
+            to = d['channel'].decode().split(self.redis_prefix, 1)[1]
+            msg = d['data'].decode()
+            valid_target = self.get_channel(to) is not None if is_channel(to) else len(to) > 0
+
+            if valid_target and len(msg) > 0:
+                self.log('redis message: %s to %s' % (msg, to))
+                self.send_message(to, msg)
 
 
 if __name__ == '__main__':
