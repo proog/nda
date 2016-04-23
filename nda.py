@@ -63,6 +63,7 @@ class NDA(IRC):
         self.last_passive = datetime.min
         self.database = Database('nda.db', aliases, ignore_nicks)
         self.twitter = Twitter(twitter_consumer_key, twitter_consumer_secret, twitter_access_token, twitter_access_token_secret)
+        self.redis_sub = None
 
         if use_redis:
             try:
