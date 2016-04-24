@@ -32,7 +32,8 @@ class Channel:
 class NDA(IRC):
     passive_interval = 60  # how long between performing passive, input independent operations like mail
     admin_duration = 30    # how long an admin session is active after authenticating with !su
-    redis_prefix = 'nda:'
+    redis_in_prefix = 'ndain:'
+    redis_out_prefix = 'ndaout:'
 
     def __init__(self, conf_file):
         with open(conf_file, 'r', encoding='utf-8') as f:
@@ -68,15 +69,16 @@ class NDA(IRC):
         self.twitter = Twitter(tw_consumer_key, tw_consumer_secret, tw_access_token, tw_access_secret)
 
         use_redis = conf.get('use_redis', False)
-        self.redis_sub = None
+        self.redis, self.redis_sub = None, None
 
         if use_redis:
             try:
-                self.redis_sub = redis.StrictRedis().pubsub(ignore_subscribe_messages=True)
-                self.redis_sub.psubscribe('%s*' % self.redis_prefix)
+                self.redis = redis.StrictRedis()
+                self.redis_sub = self.redis.pubsub(ignore_subscribe_messages=True)
+                self.redis_sub.psubscribe('%s*' % self.redis_in_prefix)
             except:
                 self.log('Couldn\'t connect to redis, disabling redis support')
-                self.redis_sub = None
+                self.redis, self.redis_sub = None, None
 
     def unknown_error_occurred(self, error):
         for channel in self.channels:
@@ -95,6 +97,10 @@ class NDA(IRC):
             self._join(channel.name)
 
     def message_sent(self, to, message):
+        # redis logging
+        if self.redis is not None:
+            self.redis.publish('%s%s' % (self.redis_out_prefix, to), message)
+
         # add own message to the quotes database
         if self.get_channel(to) is not None:
             timestamp = int(datetime.utcnow().timestamp())
@@ -143,6 +149,10 @@ class NDA(IRC):
         channel = self.get_channel(reply_target)
         tokens = message.split()
         _, _, raw_args = message.partition(' ')
+
+        # redis logging
+        if self.redis is not None:
+            self.redis.publish('%s%s' % (self.redis_out_prefix, reply_target), message)
 
         if len(tokens) == 0:
             return  # don't process empty or whitespace-only messages
@@ -513,7 +523,7 @@ class NDA(IRC):
             if d['type'] != 'pmessage':
                 continue
 
-            to = d['channel'].decode().split(self.redis_prefix, 1)[1]
+            to = d['channel'].decode().split(self.redis_in_prefix, 1)[1]
             msg = d['data'].decode()
             valid_target = self.get_channel(to) is not None if is_channel(to) else len(to) > 0
 
