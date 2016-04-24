@@ -516,7 +516,11 @@ class NDA(IRC):
 
     def redis_input(self):
         while self.redis_sub is not None:
-            d = self.redis_sub.get_message()
+            try:
+                d = self.redis_sub.get_message()
+            except:
+                self.log('Error getting message from redis')
+                return
 
             if d is None:
                 break
