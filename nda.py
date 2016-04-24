@@ -291,7 +291,7 @@ class NDA(IRC):
         def update():
             if shell.git_pull():
                 self._disconnect('if i\'m not back in a few seconds, something is wrong')
-                time.sleep(5)  # give the server time to process disconnection to prevent nick collision
+                time.sleep(2)  # give the server time to process disconnection to prevent nick collision
                 shell.restart(__file__)
             else:
                 self.send_message(reply_target, 'pull failed, manual update required :(')
