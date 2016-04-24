@@ -37,32 +37,37 @@ class NDA(IRC):
     def __init__(self, conf_file):
         with open(conf_file, 'r', encoding='utf-8') as f:
             conf = json.load(f)
-            address = conf['address']
-            port = conf.get('port', 6667)
-            user = conf['user']
-            nicks = conf['nicks']
-            real_name = conf['real_name']
-            nickserv_password = conf.get('nickserv_password', None)
-            logging = conf.get('logging', False)
-            self.channels = [Channel(c) for c in conf['channels']]
-            self.admin_password = conf.get('admin_password', '')
-            self.idle_talk = conf.get('idle_talk', False)
-            self.auto_tweet_regex = conf.get('auto_tweet_regex', None)
-            self.youtube_api_key = conf.get('youtube_api_key', None)
-            self.pastebin_api_key = conf.get('pastebin_api_key', None)
-            self.reddit_consumer_key = conf.get('reddit_consumer_key', None)
-            self.reddit_consumer_secret = conf.get('reddit_consumer_secret', None)
-            use_redis = conf.get('use_redis', False)
-            twitter_consumer_key = conf.get('twitter_consumer_key', None)
-            twitter_consumer_secret = conf.get('twitter_consumer_secret', None)
-            twitter_access_token = conf.get('twitter_access_token', None)
-            twitter_access_token_secret = conf.get('twitter_access_token_secret', None)
-            aliases = conf.get('aliases', {})
-            ignore_nicks = conf.get('ignore_nicks', [])
+        address = conf['address']
+        port = conf.get('port', 6667)
+        user = conf['user']
+        real_name = conf['real_name']
+        nicks = conf['nicks']
+        ns_password = conf.get('nickserv_password', None)
+        logging = conf.get('logging', False)
+        super().__init__(address, port, user, real_name, nicks, ns_password, logging)
+
+        self.channels = [Channel(c) for c in conf['channels']]
+        self.admin_password = conf.get('admin_password', '')
+        self.idle_talk = conf.get('idle_talk', False)
+        self.auto_tweet_regex = conf.get('auto_tweet_regex', None)
+        self.youtube_api_key = conf.get('youtube_api_key', None)
+        self.pastebin_api_key = conf.get('pastebin_api_key', None)
+        self.reddit_consumer_key = conf.get('reddit_consumer_key', None)
+        self.reddit_consumer_secret = conf.get('reddit_consumer_secret', None)
         self.admin_sessions = {}
         self.last_passive = datetime.min
+
+        aliases = conf.get('aliases', {})
+        ignore_nicks = conf.get('ignore_nicks', [])
         self.database = Database('nda.db', aliases, ignore_nicks)
-        self.twitter = Twitter(twitter_consumer_key, twitter_consumer_secret, twitter_access_token, twitter_access_token_secret)
+
+        tw_consumer_key = conf.get('twitter_consumer_key', None)
+        tw_consumer_secret = conf.get('twitter_consumer_secret', None)
+        tw_access_token = conf.get('twitter_access_token', None)
+        tw_access_secret = conf.get('twitter_access_token_secret', None)
+        self.twitter = Twitter(tw_consumer_key, tw_consumer_secret, tw_access_token, tw_access_secret)
+
+        use_redis = conf.get('use_redis', False)
         self.redis_sub = None
 
         if use_redis:
@@ -70,9 +75,8 @@ class NDA(IRC):
                 self.redis_sub = redis.StrictRedis().pubsub(ignore_subscribe_messages=True)
                 self.redis_sub.psubscribe('%s*' % self.redis_prefix)
             except:
+                self.log('Couldn\'t connect to redis, disabling redis support')
                 self.redis_sub = None
-
-        super().__init__(address, port, user, real_name, nicks, nickserv_password, logging)
 
     def unknown_error_occurred(self, error):
         for channel in self.channels:
