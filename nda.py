@@ -519,7 +519,8 @@ class NDA(IRC):
             try:
                 d = self.redis_sub.get_message()
             except:
-                self.log('Error getting message from redis')
+                self.log('Error getting message from redis, disabling redis support')
+                self.redis, self.redis_sub = None, None
                 return
 
             if d is None:
