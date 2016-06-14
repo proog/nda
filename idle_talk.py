@@ -62,10 +62,10 @@ class IdleTalk:
 
 
 class IdleTimer:
-    min_idle_delay = 14400  # 4 hours
-    max_idle_delay = 18000  # 5 hours
+    min_idle_delay = 1800  # 30 mins
+    max_idle_delay = 7200  # 2 hours
     min_message_interval = 5
-    max_message_interval = 14400  # 4 hours
+    max_message_interval = 1800  # 30 mins
 
     def _random_delay(self):
         return random.randint(self.min_idle_delay, self.max_idle_delay)
