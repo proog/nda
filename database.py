@@ -129,7 +129,7 @@ class Database:
 
         return '%s -- %s, %s (%i)' % (message, normalize_nick(author, self.aliases), date, seq_id)
 
-    def random_quote(self, channel, author=None, year=None, word=None, add_author_info=True):
+    def random_quote(self, channel, author=None, year=None, word=None, stringify=True):
         num_rows = self.quote_count(channel, author, year, word)
 
         if num_rows == 0:
@@ -145,7 +145,9 @@ class Database:
         (seq_id, timestamp, author, message) = cursor.fetchone()
         date = datetime.utcfromtimestamp(timestamp).strftime('%b %d %Y')
 
-        return '%s -- %s, %s (%i)' % (message, author, date, seq_id) if add_author_info else message
+        parts = (message, author, date, seq_id)
+
+        return '%s -- %s, %s (%i)' % parts if stringify else parts
 
     def quote_count(self, channel, author=None, year=None, word=None):
         where, params = self._build_quote_where(channel, author, year, word)

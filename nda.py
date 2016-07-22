@@ -22,11 +22,23 @@ from util import clamp, is_channel
 
 
 class Channel:
+    history_max_len = 50
+
     def __init__(self, name):
         self.name = name
         self.idle_timer = IdleTimer()
         self.game = Maze()
         self.rpg = RPG(name)
+        self.history = []
+
+    def add_history(self, description, detail):
+        self.history.append((description, detail))
+
+        if len(self.history) > self.history_max_len:
+            self.history = self.history[-self.history_max_len:]
+
+    def get_history(self, last=1):
+        return self.history[-last:]
 
 
 class NDA(IRC):
@@ -123,15 +135,21 @@ class NDA(IRC):
         if self.idle_talk:
             for channel in self.channels:
                 if channel.idle_timer.can_talk():
-                    channel.idle_timer.message_sent()  # notify idle timer that we sent something, even with no quote
-                    quote = self.database.random_quote(channel=channel.name, add_author_info=False)
+                    seq_id = 0
+                    quote = self.database.random_quote(channel=channel.name, stringify=False)
                     if quote is not None:
-                        self.send_message(channel.name, quote)
+                        message, author, date, seq_id = quote
+                        self.send_message(channel.name, message)
+                    channel.add_history('idle talk', 'seq_id=%i, i=%i, d=%i'
+                                        % (seq_id, channel.idle_timer.interval, channel.idle_timer.delay))
+                    channel.idle_timer.message_sent()  # notify idle timer that we sent something, even with no quote
 
         # check if it's time for a festive greeting
         for channel_name, greeting in greetings.greet():
-            if channel_name in [c.name for c in self.channels]:
+            channel = self.get_channel(channel_name)
+            if channel is not None:
                 self.send_message(channel_name, greeting)
+                channel.add_history('greeting', greeting)
 
         self.last_passive = datetime.utcnow()
 
@@ -227,6 +245,7 @@ class NDA(IRC):
             author, year, word = parse_quote_command()
             random_quote = self.database.random_quote(reply_target, author, year, word)
             self.send_message(reply_target, random_quote if random_quote is not None else 'no quotes found :(')
+            channel.add_history('quote', 'a=%s, y=%s, w=%s' % (author, year, word))
 
         def quote_id():
             if channel is None:  # only allow quote requests in a channel
@@ -253,6 +272,7 @@ class NDA(IRC):
             author, year, word = parse_quote_command()
             count = self.database.quote_count(reply_target, author, year, word)
             self.send_message(reply_target, '%i quotes' % count)
+            channel.add_history('quote count', 'a=%s, y=%s, w=%s' % (author, year, word))
 
         def quote_top(percent=False):
             if channel is None:
@@ -262,6 +282,7 @@ class NDA(IRC):
             author, year, word = parse_quote_command()
             func = self.database.quote_top_percent if percent else self.database.quote_top
             top = func(reply_target, 5, year, word)
+            channel.add_history('quote top', 'y=%s, w=%s, pct=%s' % (year, word, percent))
             if len(top) > 0:
                 self.send_messages(reply_target, top)
             else:
@@ -379,6 +400,19 @@ class NDA(IRC):
             else:
                 self.send_message(reply_target, 'missing nick :(')
 
+        def history():
+            history_channel = self.get_channel(args[0]) if len(args) > 0 else channel
+
+            if history_channel is None:
+                self.send_message(reply_target, 'channel not found, please specify #channel :(')
+                return
+
+            recent = history_channel.get_history(3)
+            if len(recent) == 0:
+                self.send_message(reply_target, 'No history yet :(')
+                return
+            self.send_messages(reply_target, ['%s: %s' % entry for entry in recent])
+
         def help():
             self.send_messages(source_nick, [
                 '!context ID [NUM_LINES]: pastebin context for a quote, optionally with number of lines (default is 20)',
@@ -408,6 +442,7 @@ class NDA(IRC):
             '!die': lambda: admin(die),
             '!help': help,
             '!hi': lambda: self.send_message(reply_target, 'hi %s, jag heter %s, %s heter jag' % (source_nick, self.current_nick(), self.current_nick())),
+            '!history': history,
             '!imgur': lambda: self.send_message(reply_target, link_generator.imgur_link()),
             '!isitmovienight': lambda: self.send_message(reply_target, 'maybe :)' if datetime.utcnow().weekday() in [4, 5] else 'no :('),
             '!penis': penis,
