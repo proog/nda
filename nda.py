@@ -233,7 +233,7 @@ class NDA(IRC):
         def porn():
             link = link_generator.xhamster_link()
             self.send_message(reply_target, link)
-            if link.startswith('http://'):
+            if link.startswith('http://') or link.startswith('https://'):
                 comment = link_lookup.xhamster_comment(link)
                 self.send_message(reply_target, comment)
 
