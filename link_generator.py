@@ -70,14 +70,14 @@ def xhamster_link():
 
     for attempt in range(0, max_tries):
         try:
-            response = requests.head('http://xhamster.com/random.php', timeout=timeout, headers={
+            response = requests.head('https://xhamster.com/random.php', timeout=timeout, headers={
                 'User-Agent': random.choice(user_agents),
                 'Cookie': 'x_content_preference_index=s%3A3%3A%22gay%22%3B' if gay else ''
             })
             location = response.headers.get('Location', None)
 
             # sometimes their randomizer fails and redirects to the front page, try again if that happens
-            if response.status_code == 302 and location is not None and location != 'http://xhamster.com':
+            if response.status_code == 302 and location is not None and location != 'https://xhamster.com':
                 return location
         except RequestException:
             return 'connection failed, please try again later :('
