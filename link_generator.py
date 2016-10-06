@@ -2,6 +2,7 @@ import requests
 import requests.auth
 import random
 import json
+import re
 from requests.exceptions import *
 from datetime import datetime, timedelta
 
@@ -67,18 +68,31 @@ def reddit_link():
 
 def xhamster_link():
     gay = random.randint(0, 1) == 1
+    # sometimes their randomizer fails and redirects to the front page
+    front_redirect = re.compile('^http(s)?://(www\.)?xhamster\.com(/)?$')
+    # sometimes it redirects to https
+    https_redirect = re.compile('^https://(www\.)?xhamster\.com/random\.php$')
+
+    def request(https=False):
+        protocol = 'https' if https else 'http'
+        response = requests.head(protocol + '://xhamster.com/random.php', timeout=timeout, headers={
+            'User-Agent': random.choice(user_agents),
+            'Cookie': 'x_content_preference_index=s%3A3%3A%22gay%22%3B' if gay else ''
+        })
+        location = response.headers.get('Location', '')
+
+        if response.status_code == 302:
+            if https_redirect.match(location) and not https:
+                return request(True)
+            if not front_redirect.match(location):
+                return location
+        return None
 
     for attempt in range(0, max_tries):
         try:
-            response = requests.head('https://xhamster.com/random.php', timeout=timeout, headers={
-                'User-Agent': random.choice(user_agents),
-                'Cookie': 'x_content_preference_index=s%3A3%3A%22gay%22%3B' if gay else ''
-            })
-            location = response.headers.get('Location', None)
-
-            # sometimes their randomizer fails and redirects to the front page, try again if that happens
-            if response.status_code == 302 and location is not None and location != 'https://xhamster.com':
-                return location
+            url = request()
+            if url is not None:
+                return url
         except RequestException:
             return 'connection failed, please try again later :('
 
