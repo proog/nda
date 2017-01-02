@@ -113,7 +113,7 @@ class Database:
         messages = []
         for row in rows:
             timestamp, author, message = row
-            timestamp_formatted = datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M')
+            timestamp_formatted = datetime.fromtimestamp(timestamp, timezone.utc).strftime('%Y-%m-%d %H:%M')
             messages.append('%s <%s> %s' % (timestamp_formatted, author, message))
         return messages
 
@@ -125,7 +125,7 @@ class Database:
             return None
 
         (seq_id, timestamp, author, message) = quote
-        date = datetime.utcfromtimestamp(timestamp).strftime('%b %d %Y')
+        date = datetime.fromtimestamp(timestamp, timezone.utc).strftime('%b %d %Y')
 
         return '%s -- %s, %s (%i)' % (message, normalize_nick(author, self.aliases), date, seq_id)
 
@@ -143,7 +143,7 @@ class Database:
         cursor.execute(query, params)
 
         (seq_id, timestamp, author, message) = cursor.fetchone()
-        date = datetime.utcfromtimestamp(timestamp).strftime('%b %d %Y')
+        date = datetime.fromtimestamp(timestamp, timezone.utc).strftime('%b %d %Y')
 
         parts = (message, author, date, seq_id)
 
@@ -217,7 +217,7 @@ class Database:
 
     def update_last_seen(self, nick, timestamp=None):
         nick = normalize_nick(nick, self.aliases)
-        timestamp = timestamp if timestamp is not None else int(datetime.utcnow().timestamp())
+        timestamp = timestamp if timestamp is not None else int(datetime.now(timezone.utc).timestamp())
         cursor = self.db.cursor()
         cursor.execute('INSERT OR IGNORE INTO nicks (nick) VALUES (?)', (nick,))
         cursor.execute('UPDATE nicks SET last_seen=? WHERE nick=?', (timestamp, nick))
@@ -232,14 +232,14 @@ class Database:
         if row is None or row[0] is None:
             return '%s has never been seen :(' % nick
 
-        return '%s was last seen on %s :)' % (nick, datetime.utcfromtimestamp(row[0]).strftime('%Y-%m-%d %H:%M:%S'))
+        return '%s was last seen on %s :)' % (nick, datetime.fromtimestamp(row[0], timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC'))
 
     def mail_send(self, from_, to, message):
         from_ = normalize_nick(from_, self.aliases)
         to = normalize_nick(to, self.aliases)
         cursor = self.db.cursor()
         cursor.execute('INSERT INTO mail (from_nick, to_nick, message, received, sent_at, received_at) VALUES (?, ?, ?, ?, ?, ?)',
-                       (from_, to, message, False, int(datetime.utcnow().timestamp()), None))
+                       (from_, to, message, False, int(datetime.now(timezone.utc).timestamp()), None))
         self.db.commit()
 
     def mail_unsend(self, from_, id):
@@ -259,10 +259,10 @@ class Database:
         cursor = self.db.cursor()
         cursor.execute('SELECT from_nick, message, sent_at FROM mail WHERE to_nick=? AND received=? ORDER BY sent_at ASC', (to, False))
 
-        messages = ['%s -- %s, %s' % (msg, from_, datetime.utcfromtimestamp(sent).strftime('%Y-%m-%d %H:%M:%S'))
+        messages = ['%s -- %s, %s' % (msg, from_, datetime.fromtimestamp(sent, timezone.utc).strftime('%Y-%m-%d %H:%M:%S'))
                     for from_, msg, sent in cursor.fetchall()]
 
-        now = int(datetime.utcnow().timestamp())
+        now = int(datetime.now(timezone.utc).timestamp())
         cursor.execute('UPDATE mail SET received=?, received_at=? WHERE to_nick=? AND received=?', (True, now, to, False))
         self.db.commit()
 
@@ -279,7 +279,7 @@ class Database:
         messages = 0
         imported = 0
         skipped = 0
-        log_date = datetime.utcfromtimestamp(0)
+        log_date = datetime.fromtimestamp(0, timezone.utc)
 
         with open(filename, 'r', encoding='utf-8') as log:
             for line in log:

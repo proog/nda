@@ -1,5 +1,5 @@
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 def normalize_nick(nick, aliases_map):
@@ -15,11 +15,11 @@ def normalize_nick(nick, aliases_map):
 def year_to_timestamps(year):
     if year is None:
         return 0, sys.maxsize
-    elif year not in range(1970, datetime.utcnow().year + 1):
+    elif year not in range(1970, datetime.now(timezone.utc).year + 1):
         return None
 
-    time_min = int(datetime(year, 1, 1, 0, 0, 0).timestamp())
-    time_max = int(datetime(year, 12, 31, 23, 59, 59).timestamp())
+    time_min = int(datetime(year, 1, 1, 0, 0, 0, tzinfo=timezone.utc).timestamp())
+    time_max = int(datetime(year, 12, 31, 23, 59, 59, tzinfo=timezone.utc).timestamp())
     return time_min, time_max
 
 

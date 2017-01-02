@@ -11,7 +11,7 @@ import greetings
 import sqlite3
 import random
 import redis
-from datetime import datetime
+from datetime import datetime, timezone
 from irc import IRC
 from idle_talk import IdleTimer
 from database import Database
@@ -115,7 +115,7 @@ class NDA(IRC):
 
         # add own message to the quotes database
         if self.get_channel(to) is not None:
-            timestamp = int(datetime.utcnow().timestamp())
+            timestamp = int(datetime.now(timezone.utc).timestamp())
             self.database.add_quote(to, timestamp, self.current_nick(), message, full_only=True)
 
     def main_loop_iteration(self):
@@ -185,7 +185,7 @@ class NDA(IRC):
 
         if channel is not None:
             channel.idle_timer.message_received()  # notify idle timer that someone talked
-            timestamp = int(datetime.utcnow().timestamp())
+            timestamp = int(datetime.now(timezone.utc).timestamp())
             self.database.add_quote(channel.name, timestamp, source_nick, message, full_only=handled)  # add message to the quotes database
 
         # implicit commands
