@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 
 def normalize_nick(nick, aliases_map):
-    nick = nick.lower().strip('_ ')  # try to normalize nicks to lowercase versions and no alts
+    nick = nick.lower().lstrip('~&@%+ ').strip('_ ')  # try to normalize nicks to lowercase versions and no alts
 
     for (master, aliases) in aliases_map.items():
         if nick == master or nick in aliases:
@@ -34,7 +34,7 @@ def clamp(minimum, i, maximum):
 
 
 def is_channel(name):
-    for p in ['&', '#', '+', '!']:
+    for p in ['#', '!']:
         if name.startswith(p):
             return True
     return False

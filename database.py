@@ -299,7 +299,7 @@ class Database:
                     log_date = datetime.strptime(date_str, '%b %d %Y %z')
                     continue
 
-                match = re.match(r'^(\d\d):(\d\d)\s<.(.+?)>\s(.+)$', line)  # 12:34 <&author> message
+                match = re.match(r'^(\d\d):(\d\d)\s<(.+?)>\s(.+)$', line)  # 12:34 <&author> message
 
                 if match is None:
                     continue
@@ -372,7 +372,7 @@ class Database:
 
         with open(filename, 'r', encoding='utf-8') as log:
             for line in log:
-                match = re.match(r'^(\d\d):(\d\d)\s<.(.+?)>\s(.+)$', line)
+                match = re.match(r'^(\d\d):(\d\d)\s<(.+?)>\s(.+)$', line)
 
                 if match is None:
                     continue
