@@ -81,7 +81,7 @@ def xhamster_link():
         })
         location = response.headers.get('Location', '')
 
-        if response.status_code == 302:
+        if response.status_code in [301, 302]:
             if https_redirect.match(location) and not https:
                 return request(True)
             if not front_redirect.match(location):
