@@ -34,7 +34,7 @@ def clamp(minimum, i, maximum):
 
 
 def is_channel(name):
-    for p in ['#', '!']:
-        if name.startswith(p):
+    for prefix in ['#', '!']:
+        if name.startswith(prefix):
             return True
     return False

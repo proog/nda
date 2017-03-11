@@ -1,6 +1,6 @@
-import tweepy
 import json
 from datetime import datetime
+import tweepy
 
 
 class Twitter:
@@ -49,10 +49,13 @@ class Twitter:
 if __name__ == '__main__':
     with open('nda.conf', 'r') as f:
         conf = json.load(f)
-        twitter = Twitter(conf.get('twitter_consumer_key', None),
-                          conf.get('twitter_consumer_secret', None),
-                          conf.get('twitter_access_token', None),
-                          conf.get('twitter_access_token_secret', None))
-        print(twitter.fetch('695871944449662976').text)
-        #twitter.tweet('@proogey hi')
+
+    twitter = Twitter(
+        conf.get('twitter_consumer_key', None),
+        conf.get('twitter_consumer_secret', None),
+        conf.get('twitter_access_token', None),
+        conf.get('twitter_access_token_secret', None)
+    )
+    print(twitter.fetch('695871944449662976').text)
+    #twitter.tweet('@proogey hi')
 

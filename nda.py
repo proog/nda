@@ -2,22 +2,22 @@
 
 import time
 import json
-import link_generator
-import link_lookup
-import unit_converter
-import shell
 import re
-import greetings
 import sqlite3
 import random
-import redis
 from datetime import datetime, timezone
+from redis import StrictRedis
+from twitter import Twitter
+import unit_converter
+import shell
+import greetings
 from irc import IRC
+from link_generator import LinkGenerator
+from link_lookup import LinkLookup
 from idle_talk import IdleTimer
 from database import Database
 from maze import Maze
 from rpg.main import RPG
-from twitter import Twitter
 from util import clamp, is_channel
 
 
@@ -50,47 +50,56 @@ class NDA(IRC):
     def __init__(self, conf_file):
         with open(conf_file, 'r', encoding='utf-8') as f:
             conf = json.load(f)
-        address = conf['address']
-        port = conf.get('port', 6667)
-        user = conf['user']
-        real_name = conf['real_name']
-        nicks = conf['nicks']
-        ns_password = conf.get('nickserv_password', None)
-        logging = conf.get('logging', False)
-        super().__init__(address, port, user, real_name, nicks, ns_password, logging)
+
+        super().__init__(
+            conf['address'],
+            conf.get('port', 6667),
+            conf['user'],
+            conf['real_name'],
+            conf['nicks'],
+            conf.get('nickserv_password', None),
+            conf.get('logging', False)
+        )
 
         self.channels = [Channel(c) for c in conf['channels']]
         self.admin_password = conf.get('admin_password', '')
         self.idle_talk = conf.get('idle_talk', False)
         self.auto_tweet_regex = conf.get('auto_tweet_regex', None)
-        self.youtube_api_key = conf.get('youtube_api_key', None)
-        self.pastebin_api_key = conf.get('pastebin_api_key', None)
-        self.reddit_consumer_key = conf.get('reddit_consumer_key', None)
-        self.reddit_consumer_secret = conf.get('reddit_consumer_secret', None)
         self.admin_sessions = {}
         self.last_passive = datetime.min
 
-        aliases = conf.get('aliases', {})
-        ignore_nicks = conf.get('ignore_nicks', [])
-        self.database = Database('nda.db', aliases, ignore_nicks)
-
-        tw_consumer_key = conf.get('twitter_consumer_key', None)
-        tw_consumer_secret = conf.get('twitter_consumer_secret', None)
-        tw_access_token = conf.get('twitter_access_token', None)
-        tw_access_secret = conf.get('twitter_access_token_secret', None)
-        self.twitter = Twitter(tw_consumer_key, tw_consumer_secret, tw_access_token, tw_access_secret)
+        self.database = Database(
+            'nda.db',
+            conf.get('aliases', {}),
+            conf.get('ignore_nicks', [])
+        )
+        self.link_gen = LinkGenerator(
+            conf.get('reddit_consumer_key', None),
+            conf.get('reddit_consumer_secret', None),
+            conf.get('pastebin_api_key', None)
+        )
+        self.twitter = Twitter(
+            conf.get('twitter_consumer_key', None),
+            conf.get('twitter_consumer_secret', None),
+            conf.get('twitter_access_token', None),
+            conf.get('twitter_access_token_secret', None)
+        )
+        self.link_lookup = LinkLookup(
+            conf.get('youtube_api_key', None),
+            self.twitter
+        )
 
         use_redis = conf.get('use_redis', False)
         self.redis, self.redis_sub = None, None
 
         if use_redis:
             try:
-                self.redis = redis.StrictRedis()
-                self.redis_sub = self.redis.pubsub(ignore_subscribe_messages=True)
-                self.redis_sub.psubscribe('%s*' % self.redis_in_prefix)
+                redis = StrictRedis()
+                redis_sub = self.redis.pubsub(ignore_subscribe_messages=True)
+                redis_sub.psubscribe('%s*' % self.redis_in_prefix)
+                self.redis, self.redis_sub = redis, redis_sub
             except:
                 self.log('Couldn\'t connect to redis, disabling redis support')
-                self.redis, self.redis_sub = None, None
 
     def unknown_error_occurred(self, error):
         for channel in self.channels:
@@ -231,10 +240,10 @@ class NDA(IRC):
             self.send_message(reply_target, 'connected on %s, %s ago' % (connect_time, uptime_str))
 
         def porn():
-            link = link_generator.xhamster_link()
+            link = self.link_gen.xhamster()
             self.send_message(reply_target, link)
             if link.startswith('http://') or link.startswith('https://'):
-                comment = link_lookup.xhamster_comment(link)
+                comment = self.link_lookup.xhamster_comment(link)
                 self.send_message(reply_target, comment)
 
         def quote():
@@ -316,7 +325,7 @@ class NDA(IRC):
                 self.send_message(reply_target, 'no context found :(')
                 return
 
-            link = link_generator.make_pastebin('\r\n'.join(context), self.pastebin_api_key)
+            link = self.link_gen.make_pastebin('\r\n'.join(context))
             self.send_message(reply_target, link if link is not None else 'couldn\'t upload to pastebin :(')
 
         def update():
@@ -385,7 +394,7 @@ class NDA(IRC):
             raise KeyboardInterrupt
 
         def penis():
-            link = link_generator.penis_link(self.reddit_consumer_key, self.reddit_consumer_secret)
+            link = self.link_gen.penis()
             self.send_message(reply_target, link if link is not None else 'couldn\'t grab a dick for you, sorry :(')
 
         def set_time():
@@ -443,7 +452,7 @@ class NDA(IRC):
             '!help': help,
             '!hi': lambda: self.send_message(reply_target, 'hi %s, jag heter %s, %s heter jag' % (source_nick, self.current_nick(), self.current_nick())),
             '!history': history,
-            '!imgur': lambda: self.send_message(reply_target, link_generator.imgur_link()),
+            '!imgur': lambda: self.send_message(reply_target, self.link_gen.imgur()),
             '!isitmovienight': lambda: self.send_message(reply_target, 'maybe :)' if datetime.utcnow().weekday() in [4, 5] else 'no :('),
             '!penis': penis,
             '!porn': porn,
@@ -452,7 +461,7 @@ class NDA(IRC):
             '!quoteid': quote_id,
             '!quotetop': quote_top,
             '!quotetopp': lambda: quote_top(True),
-            '!reddit': lambda: self.send_message(reply_target, link_generator.reddit_link()),
+            '!reddit': lambda: self.send_message(reply_target, self.link_gen.reddit()),
             '!rpg': rpg_action,
             '!seen': lambda: self.send_message(reply_target, self.database.last_seen(args[0])) if len(args) > 0 else None,
             '!settime': set_time,
@@ -461,7 +470,7 @@ class NDA(IRC):
             '!tweet': tweet,
             '!update': lambda: admin(update),
             '!uptime': uptime,
-            '!wikihow': lambda: self.send_message(reply_target, link_generator.wikihow_link()),
+            '!wikihow': lambda: self.send_message(reply_target, self.link_gen.wikihow()),
             # '!send': send_mail,
             # '!unsend': unsend_mail,
             # '!outbox': outbox,
@@ -482,17 +491,17 @@ class NDA(IRC):
 
     def implicit_command(self, message, reply_target, source_nick):
         def youtube_lookup():
-            title = link_lookup.youtube_lookup(message, self.youtube_api_key)
+            title = self.link_lookup.youtube(message)
             if title is not None:
                 self.send_message(reply_target, '^^ \x02%s\x02' % title)  # 0x02 == control character for bold text
 
         def twitter_lookup():
-            title = link_lookup.twitter_lookup(message, self.twitter)
+            title = self.link_lookup.twitter(message)
             if title is not None:
                 self.send_message(reply_target, '^^ \x02%s\x02' % title)
 
         def generic_lookup():
-            title = link_lookup.generic_lookup(message)
+            title = self.link_lookup.generic(message)
             if title is not None:
                 self.send_message(reply_target, '^^ \x02%s\x02' % title)
 
@@ -518,9 +527,9 @@ class NDA(IRC):
 
         matched = False
         matchers = [
-            ((lambda: link_lookup.contains_youtube(message)), youtube_lookup),
-            ((lambda: link_lookup.contains_twitter(message)), twitter_lookup),
-            ((lambda: link_lookup.contains_link(message) and not matched), generic_lookup),  # skip if specific link already matched
+            ((lambda: self.link_lookup.contains_youtube(message)), youtube_lookup),
+            ((lambda: self.link_lookup.contains_twitter(message)), twitter_lookup),
+            ((lambda: self.link_lookup.contains_link(message) and not matched), generic_lookup),  # skip if specific link already matched
             ((lambda: 'undertale' in message.lower()), undertale),
             (tweet_trigger, lambda: self.twitter.tweet(message)),
             # ((lambda: unit_converter.contains_unit(message)), convert_units)
